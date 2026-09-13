@@ -83,7 +83,12 @@ async function processBroadcastJob(job: NonNullable<Awaited<ReturnType<typeof cl
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const withdrawal = (await db.select().from(tonWithdrawals).where(eq(tonWithdrawals.id, job.withdrawalId)).limit(1))[0];
-  if (!withdrawal || withdrawal.status !== "queued") {
+  if (!withdrawal || (withdrawal.status !== "queued" && withdrawal.status !== "broadcast_pending")) {
+    await completeTonPayoutJob(job.id, job.leaseToken);
+    return;
+  }
+  if (withdrawal.status === "broadcast_pending") {
+    await enqueueTonPayoutJob(withdrawal.id, "reconcile");
     await completeTonPayoutJob(job.id, job.leaseToken);
     return;
   }
@@ -108,10 +113,13 @@ async function processBroadcastJob(job: NonNullable<Awaited<ReturnType<typeof cl
       if (finalNetNano !== initialNetNano) {
         prepared = await buildTonPayoutExternalBoc({ destinationWalletAddress: withdrawal.destinationWalletAddress, amountNano: finalNetNano, reference: withdrawal.reference });
       }
-    } catch {
-      await cancelQueuedWithdrawalForFeeFailure(withdrawal.id, withdrawal.userOpenId, grossAmountNano);
-      await completeTonPayoutJob(job.id, job.leaseToken);
-      return;
+    } catch (error) {
+      if (error instanceof Error && error.message === "fee_exceeds_amount") {
+        await cancelQueuedWithdrawalForFeeFailure(withdrawal.id, withdrawal.userOpenId, grossAmountNano);
+        await completeTonPayoutJob(job.id, job.leaseToken);
+        return;
+      }
+      throw error;
     }
     const netAmountNano = grossAmountNano - estimatedFeeNano;
     const marked = await db.update(tonWithdrawals).set({
