@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { UserAvatar, useUserAvatarInfo } from "@/components/UserAvatar";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { closestCenter, DndContext, DragOverlay, KeyboardSensor, PointerSensor, type DragEndEvent, type DragStartEvent, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -480,31 +481,6 @@ function SettingsSheet({
         </div>
       </SheetContent>
     </Sheet>
-  );
-}
-
-function SafeAvatar({ src, fallback, className = "", userId }: { src?: string | null; fallback: ReactNode; className?: string; userId?: string | null }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [src]);
-
-  // If the primary source fails, and we have a Telegram User ID, try the server-side proxy.
-  const proxySrc = (failed && userId && src !== `/api/telegram-user-avatar/${userId}`)
-    ? `/api/telegram-user-avatar/${userId}`
-    : null;
-
-  const currentSrc = proxySrc || src;
-
-  if (!currentSrc || (failed && !proxySrc)) return <>{fallback}</>;
-
-  return (
-    <img
-      src={currentSrc}
-      alt=""
-      className={className}
-      loading="lazy"
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-    />
   );
 }
 
@@ -1917,76 +1893,11 @@ export default function Home({ onReady }: { onReady?: () => void }) {
     typeof window !== "undefined"
       ? window.Telegram?.WebApp?.initDataUnsafe?.user
       : undefined;
-  const telegramAvatar = telegramUser?.photo_url;
-  const telegramUserId = telegramUser?.id
-    ? String(telegramUser.id)
-    : (user?.openId?.startsWith("telegram:") ? user.openId.replace("telegram:", "") : null);
-  const telegramAvatarVersion =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.Telegram?.WebApp?.initData ?? "").get("auth_date")
-      : null;
-
-  const telegramFullName = telegramUser
-    ? [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(" ").trim()
-    : "";
-  const userDisplayName =
-    telegramFullName ||
-    user?.name ||
-    telegramUser?.username ||
-    user?.telegramUsername ||
-    tx("Пользователь Telegram", "Telegram user");
-  const userTelegramUsername = telegramUser?.username || user?.telegramUsername || null;
-
-    const [userAvatarStage, setUserAvatarStage] = useState(0); // 0: direct, 1: proxy, 2: username, 3: initials
-
-  const displayUserAvatar = useMemo(() => {
-    const directUrl = telegramAvatar ? `${telegramAvatar}${telegramAvatar.includes("?") ? "&" : "?"}tgtop_avatar=${encodeURIComponent(telegramAvatarVersion ?? "current")}` : null;
-    const proxyUrl = (telegramUserId ? `/api/telegram-user-avatar/${telegramUserId}` : null) || user?.avatarUrl || null;
-    const username = (userTelegramUsername || telegramUser?.username)?.replace(/^@/, "").trim();
-    const usernameUrl = username ? `https://t.me/i/userpic/320/${encodeURIComponent(username)}.jpg` : null;
-    
-    if (userAvatarStage === 0) return directUrl || proxyUrl || usernameUrl;
-    if (userAvatarStage === 1) return proxyUrl || usernameUrl || directUrl;
-    if (userAvatarStage === 2) return usernameUrl || proxyUrl;
-    return null;
-  }, [telegramAvatar, userAvatarStage, telegramAvatarVersion, telegramUserId, user?.avatarUrl, userTelegramUsername, telegramUser?.username]);
-
-  useEffect(() => {
-    setUserAvatarStage(0);
-  }, [telegramUserId, user?.avatarUrl, telegramAvatar]);
-
-  const userInitial = (
-    userDisplayName.replace(/^@/, "").trim().slice(0, 1) ||
-    userTelegramUsername?.replace(/^@/, "").trim().slice(0, 1) ||
-    "T"
-  ).toUpperCase();
-  
-  const renderUserAvatar = (size: "sm" | "md") => {
-    const isSm = size === "sm";
-    const sizeClasses = isSm ? "h-9 w-9 text-xs" : "h-12 w-12 text-base";
-    const hasPhoto = Boolean(displayUserAvatar) && userAvatarStage < 3;
-
-    return (
-      <span
-        className={`grid ${sizeClasses} shrink-0 place-items-center overflow-hidden rounded-full border border-white/15 bg-[#1b2430] font-bold text-white shadow-sm ring-1 ring-white/10`}
-      >
-        {hasPhoto && displayUserAvatar ? (
-          <img
-            key={displayUserAvatar}
-            src={displayUserAvatar}
-            alt=""
-            referrerPolicy="no-referrer"
-            className="h-full w-full object-cover"
-            onError={() => setUserAvatarStage(prev => prev + 1)}
-          />
-        ) : (
-          <span className="grid h-full w-full place-items-center bg-gradient-to-br from-[#2563eb] via-[#1d4ed8] to-[#0f172a] text-white font-bold drop-shadow-sm select-none">
-            {userInitial}
-          </span>
-        )}
-      </span>
-    );
-  };
+  const { displayName: userDisplayName, userTelegramUsername } = useUserAvatarInfo(
+    user,
+    telegramUser,
+    tx("Пользователь Telegram", "Telegram user")
+  );
   const selectedSlot = detail
     ? detailSlots.find(slot => slot.group?.id === detail.group.id)
     : undefined;
@@ -2689,7 +2600,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                 aria-label="Открыть профиль"
                 className="flex items-center transition-transform hover:scale-105"
               >
-                {renderUserAvatar("sm")}
+                <UserAvatar size="sm" user={user} telegramUser={telegramUser} defaultName={tx("Пользователь Telegram", "Telegram user")} />
               </button>
             ) : (
               <button
@@ -3495,7 +3406,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       disabled={!managerPublic || !detail.group.managerUsername}
                       className="flex min-h-[38px] w-[76px] shrink-0 items-center gap-1.5 rounded-xl border border-[#354966] bg-[#202b3a] px-2 text-left text-slate-100 transition-colors hover:bg-[#253247] active:scale-[0.98] disabled:cursor-default"
                     >
-                      <SafeAvatar src={detail.group.managerAvatarUrl} userId={detail.group.managerTelegramUserId} fallback={<UserRound className="h-4 w-4 shrink-0 text-slate-400" />} className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                      {detail.group.managerAvatarUrl ? <img src={detail.group.managerAvatarUrl} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" /> : <UserRound className="h-4 w-4 shrink-0 text-slate-400" />}
                       <b className="truncate text-[9px] leading-3">{detail.group.managerName ?? "Менеджер"}</b>
                     </button>}
                   </div>
@@ -3773,7 +3684,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                 <div className="rounded-2xl border border-white/8 bg-[#111720] p-5">
                   <div className="flex items-center gap-3">
                     <span className="grid h-12 w-12 overflow-hidden rounded-full border border-white/10 bg-[#1b2430] text-sm font-semibold">
-                      <SafeAvatar src={publicOwner.owner.avatarUrl} userId={publicOwner.owner.openId?.startsWith("telegram:") ? publicOwner.owner.openId.replace("telegram:", "") : null} fallback={publicOwner.owner.name?.slice(0, 1).toUpperCase() ?? "T"} className="h-full w-full object-cover" />
+                      {publicOwner.owner.avatarUrl ? <img src={publicOwner.owner.avatarUrl} alt="" className="h-full w-full object-cover" /> : (publicOwner.owner.name?.slice(0, 1).toUpperCase() ?? "T")}
                     </span>
                     <span className="min-w-0">
                       <h1 className="truncate text-lg font-semibold">{publicOwner.owner.name ?? tx("Пользователь TG TOP", "TG TOP user")}</h1>
@@ -3867,7 +3778,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     <button type="button" onClick={() => setModerationTab("bots")} className={`h-9 rounded-lg text-xs font-semibold transition-all ${moderationTab === "bots" ? "bg-[#3f8cff] text-white shadow-md shadow-[#3f8cff]/25 font-bold" : "text-slate-400 hover:text-slate-200"}`}>Боты <span className="ml-1 text-[10px] opacity-80">{allBotListings.length}</span></button>
                   </div>
                   {moderationTab === "communities" ? (
-                    <section className="overflow-hidden rounded-2xl border border-[#3390ec]/25 bg-[#202b3a]"><div className="border-b border-white/8 px-3 py-3"><b className="text-sm text-slate-100">Залистенные сообщества</b><p className="mt-1 text-[11px] leading-4 text-slate-400">Полный список по времени листинга: свежие сверху.</p></div>{activeModerationListings.length ? <div className="divide-y divide-white/8">{activeModerationListings.map(group => { const groupUrl = group.inviteLink ?? (group.username ? `https://t.me/${group.username}` : null); return <article key={group.id} className="flex items-center gap-2 px-3 py-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/10 bg-[#17212b] text-[10px] font-semibold text-slate-300"><SafeAvatar src={group.avatarFileId ? `/api/telegram-avatar/${encodeURIComponent(group.chatId)}` : null} fallback={group.title.slice(0, 1).toUpperCase()} className="h-full w-full object-cover" /></span><button type="button" onClick={() => groupUrl && openTelegramInNewBrowserTab(groupUrl)} disabled={!groupUrl} className="min-w-0 flex-1 text-left disabled:opacity-50"><b className="block truncate text-xs text-slate-100">{group.title}</b><small className="block truncate text-[10px] text-slate-400">{group.category} · {group.ownerName ?? "Владелец"} · {group.listedAt ? new Date(group.listedAt).toLocaleString() : "—"}</small></button><button type="button" onClick={() => { setModerationReasonDraft(""); setPendingModerationGroup({ id: group.id, title: group.title }); }} disabled={moderateGroup.isPending} aria-label={`Снять ${group.title} с ТОПа`} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-red-400/35 bg-red-500/10 text-red-200 disabled:opacity-35"><Trash2 className="h-4 w-4" /></button></article>; })}</div> : <p className="px-4 py-8 text-center text-xs text-slate-500">Залистенных сообществ сейчас нет.</p>}</section>
+                    <section className="overflow-hidden rounded-2xl border border-[#3390ec]/25 bg-[#202b3a]"><div className="border-b border-white/8 px-3 py-3"><b className="text-sm text-slate-100">Залистенные сообщества</b><p className="mt-1 text-[11px] leading-4 text-slate-400">Полный список по времени листинга: свежие сверху.</p></div>{activeModerationListings.length ? <div className="divide-y divide-white/8">{activeModerationListings.map(group => { const groupUrl = group.inviteLink ?? (group.username ? `https://t.me/${group.username}` : null); return <article key={group.id} className="flex items-center gap-2 px-3 py-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/10 bg-[#17212b] text-[10px] font-semibold text-slate-300">{group.avatarFileId ? <img src={`/api/telegram-avatar/${encodeURIComponent(group.chatId)}`} alt="" className="h-full w-full object-cover" /> : group.title.slice(0, 1).toUpperCase()}</span><button type="button" onClick={() => groupUrl && openTelegramInNewBrowserTab(groupUrl)} disabled={!groupUrl} className="min-w-0 flex-1 text-left disabled:opacity-50"><b className="block truncate text-xs text-slate-100">{group.title}</b><small className="block truncate text-[10px] text-slate-400">{group.category} · {group.ownerName ?? "Владелец"} · {group.listedAt ? new Date(group.listedAt).toLocaleString() : "—"}</small></button><button type="button" onClick={() => { setModerationReasonDraft(""); setPendingModerationGroup({ id: group.id, title: group.title }); }} disabled={moderateGroup.isPending} aria-label={`Снять ${group.title} с ТОПа`} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-red-400/35 bg-red-500/10 text-red-200 disabled:opacity-35"><Trash2 className="h-4 w-4" /></button></article>; })}</div> : <p className="px-4 py-8 text-center text-xs text-slate-500">Залистенных сообществ сейчас нет.</p>}</section>
                   ) : (
                     <section className="space-y-2"><div className="grid grid-cols-4 rounded-xl border border-white/8 bg-[#111720] p-0.5">{([{ key: "all", label: "Все" }, { key: "pending", label: "Заявки" }, { key: "approved", label: "Лист" }, { key: "rejected", label: "Отказ" }] as const).map(item => <button key={item.key} type="button" onClick={() => setBotModerationFilter(item.key)} className={`h-8 rounded-lg text-[10px] font-semibold transition-all ${botModerationFilter === item.key ? "bg-[#3f8cff] text-white shadow-md shadow-[#3f8cff]/25 font-bold" : "text-slate-400 hover:text-slate-200"}`}>{item.label}</button>)}</div><div className="overflow-hidden rounded-2xl border border-violet-300/20 bg-[#202b3a]"><div className="border-b border-white/8 px-3 py-3"><b className="text-sm text-slate-100">Боты</b><p className="mt-1 text-[11px] leading-4 text-slate-400">Все, на заявке, залистенные и отклонённые.</p></div>{filteredModerationBots.length ? <div className="divide-y divide-white/8">{filteredModerationBots.map(bot => { const draft = botModerationDrafts[bot.id] ?? { category: bot.category, reason: "" }; const statusLabel = bot.moderationStatus === "pending" ? "На заявке" : bot.moderationStatus === "approved" ? "Залистен" : "Отклонён"; const statusStyle = bot.moderationStatus === "pending" ? "border-amber-300/25 bg-amber-300/10 text-amber-100" : bot.moderationStatus === "approved" ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100" : "border-rose-300/25 bg-rose-400/10 text-rose-100"; return <article key={bot.id} className="space-y-2 px-3 py-3"><div className="flex items-center gap-2"><BotAvatar username={bot.username} className="h-9 w-9 rounded-lg" /><button type="button" onClick={() => openTelegramInNewBrowserTab(bot.telegramLink)} className="min-w-0 flex-1 text-left"><b className="block truncate text-xs text-slate-100">@{bot.username}</b><small className="block truncate text-[10px] text-slate-500">{bot.ownerName ?? bot.ownerTelegramUsername ?? "Владелец"} · {bot.category === "General" ? "Без рубрики" : botTopicOptions.find(topic => topic.code === bot.category)?.label ?? bot.category}</small></button><span className={`shrink-0 rounded-md border px-1.5 py-1 text-[9px] font-semibold ${statusStyle}`}>{statusLabel}</span><button type="button" onClick={() => { if (window.confirm(`Удалить @${bot.username} из каталога?`)) deleteBotListing.mutate({ botListingId: bot.id }); }} disabled={deleteBotListing.isPending} aria-label={`Удалить @${bot.username}`} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-red-400/35 bg-red-500/10 text-red-200 disabled:opacity-35"><Trash2 className="h-4 w-4" /></button></div>{bot.moderationStatus === "pending" && <><div className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-2"><Select value={draft.category} onValueChange={category => setBotModerationDrafts(current => ({ ...current, [bot.id]: { ...draft, category } }))}><SelectTrigger className="h-9 border-white/10 bg-[#17212b] text-[10px] text-slate-200"><SelectValue /></SelectTrigger><SelectContent className="border-white/10 bg-[#111720] text-slate-100"><SelectItem value="General" className="text-xs text-slate-200">Без рубрики</SelectItem>{botTopicOptions.map(topic => <SelectItem key={topic.id} value={topic.code} className="text-xs text-slate-200">{topic.label}</SelectItem>)}</SelectContent></Select><button type="button" onClick={() => moderateBotListing.mutate({ botListingId: bot.id, action: "approve", category: draft.category })} disabled={moderateBotListing.isPending} className="rounded-lg border border-emerald-300/25 bg-emerald-500/10 px-2 text-[10px] font-semibold text-emerald-100 disabled:opacity-45">Да</button><button type="button" onClick={() => moderateBotListing.mutate({ botListingId: bot.id, action: "reject", reason: draft.reason })} disabled={draft.reason.trim().length < 3 || moderateBotListing.isPending} className="rounded-lg border border-rose-300/25 bg-rose-500/10 px-2 text-[10px] font-semibold text-rose-100 disabled:opacity-45">Нет</button></div><Input value={draft.reason} onChange={event => setBotModerationDrafts(current => ({ ...current, [bot.id]: { ...draft, reason: event.target.value } }))} maxLength={255} placeholder="Причина — обязательна при отказе" className="h-8 border-white/10 bg-[#17212b] px-2 text-[10px] text-slate-100 placeholder:text-slate-600" /></>}{bot.moderationStatus === "rejected" && bot.moderationReason && <p className="text-[10px] leading-4 text-rose-200/90">Причина: {bot.moderationReason}</p>}</article>; })}</div> : <p className="px-4 py-8 text-center text-xs text-slate-500">В этом фильтре ботов нет.</p>}</div></section>
                   )}
@@ -3900,7 +3811,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     return (
                       <article key={group.id} className="flex items-center gap-2 px-3 py-2">
                         <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/10 bg-[#17212b] text-[10px] font-semibold text-slate-300">
-                          <SafeAvatar src={group.avatarFileId ? `/api/telegram-avatar/${encodeURIComponent(group.chatId)}` : null} fallback={group.title.slice(0, 1).toUpperCase()} className="h-full w-full object-cover" />
+                          {group.avatarFileId ? <img src={`/api/telegram-avatar/${encodeURIComponent(group.chatId)}`} alt="" className="h-full w-full object-cover" /> : group.title.slice(0, 1).toUpperCase()}
                         </span>
                         <button
                           type="button"
@@ -4021,7 +3932,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
             <h1 className="px-1 text-sm font-semibold text-slate-300">{tx("Личный кабинет", "Account")}</h1>
             <div className="tg-clean-surface rounded-2xl border border-white/8 bg-[#111720] p-5 shadow-[0_10px_28px_rgba(2,8,16,0.14)]">
               <div className="flex items-center gap-3.5">
-                {renderUserAvatar("md")}
+                <UserAvatar size="md" user={user} telegramUser={telegramUser} defaultName={tx("Пользователь Telegram", "Telegram user")} />
                 <div className="min-w-0 flex-1">
                   <h2 className="text-lg font-semibold text-slate-100 truncate leading-snug">
                     {userDisplayName}
@@ -4186,7 +4097,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     return <button key={entry.owner.openId} onClick={() => openOwner(entry.owner.openId)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.025]">
                       <span className="w-5 text-center text-xs font-semibold text-[#72a8ff]">{entry.rank}</span>
                       <span className="grid h-8 w-8 overflow-hidden rounded-full border border-white/10 bg-[#1b2430] text-[10px] font-semibold">
-                        <SafeAvatar src={entry.owner.avatarUrl} userId={entry.owner.openId?.startsWith("telegram:") ? entry.owner.openId.replace("telegram:", "") : null} fallback={ownerLabel.slice(0, 1).toUpperCase()} className="h-full w-full object-cover" />
+                        {entry.owner.avatarUrl ? <img src={entry.owner.avatarUrl} alt="" className="h-full w-full object-cover" /> : (ownerLabel.slice(0, 1).toUpperCase())}
                       </span>
                       <span className="min-w-0 flex-1">
                         <b className="block truncate text-xs text-slate-200">{ownerLabel}</b>
@@ -4650,7 +4561,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                   const selected = managerPublic && admin.telegramUserId === selectedManagerTelegramUserId;
                   return (
                     <button key={admin.telegramUserId} type="button" onClick={() => { setSelectedManagerTelegramUserId(admin.telegramUserId); setManagerPublic(true); }} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors ${selected ? "border-[#3f8cff]/65 bg-[#3f8cff]/12" : "border-white/8 bg-white/[0.025] hover:bg-white/[0.055]"}`}>
-                      <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full border border-white/10 bg-[#1b2430] text-xs font-semibold text-slate-300"><SafeAvatar src={admin.avatarUrl} userId={admin.telegramUserId} fallback={admin.name.slice(0, 1).toUpperCase()} className="h-full w-full object-cover" /></span>
+                      <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full border border-white/10 bg-[#1b2430] text-xs font-semibold text-slate-300">{admin.avatarUrl ? <img src={admin.avatarUrl} alt="" className="h-full w-full object-cover" /> : admin.name.slice(0, 1).toUpperCase()}</span>
                       <span className="min-w-0 flex-1"><b className="block truncate text-sm text-slate-100">{admin.name}</b>{admin.username && <small className="mt-0.5 block truncate text-[10px] text-slate-500">@{admin.username}</small>}</span>
                       <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${selected ? "border-[#3f8cff] bg-[#3f8cff] text-white" : "border-white/20 text-transparent"}`}><Check className="h-3.5 w-3.5" /></span>
                     </button>
@@ -5180,7 +5091,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                 <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500">{tx("Получатель", "Recipient")}</span>
                 <div className="mt-2 flex items-center gap-3">
                   <span className="grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-[#1b2430] text-sm font-semibold text-slate-300">
-                    <SafeAvatar src={reviewedRecipient.avatarUrl} userId={reviewedRecipient.openId?.startsWith("telegram:") ? reviewedRecipient.openId.replace("telegram:", "") : null} fallback={(reviewedRecipient.name ?? "T").slice(0, 1).toUpperCase()} className="h-full w-full object-cover" />
+                    {reviewedRecipient.avatarUrl ? <img src={reviewedRecipient.avatarUrl} alt="" className="h-full w-full object-cover" /> : (reviewedRecipient.name ?? "T").slice(0, 1).toUpperCase()}
                   </span>
                   <span className="min-w-0">
                     <b className="block truncate text-sm text-slate-100">{reviewedRecipient.name ?? tx("Пользователь TG TOP", "TG TOP user")}</b>
