@@ -26,15 +26,17 @@ export async function verifyTelegramUserChatBoost(input: { chatId: string; teleg
   }
 }
 
-export async function notifyRewardCredited(input: { telegramUserId: number; groupTitle: string; amount: number }) {
+export async function notifyRewardCredited(input: { telegramUserId: number; groupTitle: string; amount: number; reason?: string }) {
   if (!botToken) return false;
   const amount = (input.amount / 100).toFixed(2).replace(/\.?0+$/, "");
   const text = [
     "✅ GRAM зачислены на баланс",
     "",
     `+${amount} GRAM · ${input.groupTitle}`,
+    input.reason ? `Основание: ${input.reason}` : "",
+    "",
     "Баланс и история в TG TOP обновятся автоматически.",
-  ].join("\n");
+  ].filter(line => line !== "").join("\n");
   try {
     const response = await axios.post<{ ok: boolean }>(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       chat_id: input.telegramUserId,

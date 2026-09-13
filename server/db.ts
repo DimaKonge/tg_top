@@ -2580,6 +2580,8 @@ export type TelegramRewardInput = {
   inviterTelegramId?: number;
 };
 
+import { notifyRewardCredited } from "./telegramNotifications";
+
 export async function awardTelegramReward(input: TelegramRewardInput) {
   const db = await getDb();
   if (!db) return { awarded: false as const, reason: "database_unavailable" as const };
