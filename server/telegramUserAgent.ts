@@ -304,6 +304,22 @@ export async function fetchTelegramGroupProfileMedia(chatId: string, groupId: nu
   }
 }
 
+export async function fetchTelegramUserProfilePhoto(userId: string): Promise<Buffer | null> {
+  const { client } = await openConnectedTelegramUserAgentClientForWorker();
+  try {
+    const media = await client.downloadProfilePhoto(userId);
+    if (Buffer.isBuffer(media) && media.length > 0) {
+      await persistConnectedTelegramUserAgentClientSession(client);
+      return media;
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    await client.disconnect();
+  }
+}
+
 export function encryptTelegramOwnerDmPayload(value: string) {
   return encrypt(value);
 }

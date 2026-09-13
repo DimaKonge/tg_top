@@ -135,6 +135,23 @@ async function loadTelegramUserAvatar(userId: string): Promise<TelegramAvatarRes
         // Try next token
       }
     }
+    // Last resort: try the User Agent (MTProto worker) which has broader access
+    // than the Bot API for profile photos.
+    try {
+      const { fetchTelegramUserProfilePhoto } = await import("./telegramUserAgent");
+      const body = await fetchTelegramUserProfilePhoto(userId);
+      if (body) {
+        const contentType = detectSafeTelegramAvatarContentType(body, "image/jpeg", "avatar.jpg");
+        if (contentType) {
+          const result = { kind: "image", body, contentType } as const;
+          avatarCache.set(cacheKey, result, AVATAR_CACHE_TTL_MS);
+          return result;
+        }
+      }
+    } catch {
+      // User Agent not configured or failed
+    }
+
     const missing = { kind: "not-found" } as const;
     avatarCache.set(cacheKey, missing, AVATAR_NOT_FOUND_CACHE_TTL_MS);
     return missing;

@@ -483,11 +483,29 @@ function SettingsSheet({
   );
 }
 
-function SafeAvatar({ src, fallback, className = "" }: { src?: string | null; fallback: ReactNode; className?: string }) {
+function SafeAvatar({ src, fallback, className = "", userId }: { src?: string | null; fallback: ReactNode; className?: string; userId?: string | null }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [src]);
-  if (!src || failed) return <>{fallback}</>;
-  return <img src={src} alt="" className={className} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
+
+  // If the primary source fails, and we have a Telegram User ID, try the server-side proxy.
+  const proxySrc = (failed && userId && src !== `/api/telegram-user-avatar/${userId}`)
+    ? `/api/telegram-user-avatar/${userId}`
+    : null;
+
+  const currentSrc = proxySrc || src;
+
+  if (!currentSrc || (failed && !proxySrc)) return <>{fallback}</>;
+
+  return (
+    <img
+      src={currentSrc}
+      alt=""
+      className={className}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 function BotAvatar({ username, className = "", imageClassName = "" }: { username: string; className?: string; imageClassName?: string }) {
@@ -1907,9 +1925,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
     typeof window !== "undefined"
       ? new URLSearchParams(window.Telegram?.WebApp?.initData ?? "").get("auth_date")
       : null;
-  const displayUserAvatar = telegramAvatar
-    ? `${telegramAvatar}${telegramAvatar.includes("?") ? "&" : "?"}tgtop_avatar=${encodeURIComponent(telegramAvatarVersion ?? "current")}`
-    : (user?.avatarUrl || (telegramUserId ? `/api/telegram-user-avatar/${telegramUserId}` : null));
+
   const telegramFullName = telegramUser
     ? [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(" ").trim()
     : "";
@@ -1920,10 +1936,22 @@ export default function Home({ onReady }: { onReady?: () => void }) {
     user?.telegramUsername ||
     tx("Пользователь Telegram", "Telegram user");
   const userTelegramUsername = telegramUser?.username || user?.telegramUsername || null;
+
   const [userAvatarError, setUserAvatarError] = useState(false);
+
+  const displayUserAvatar = useMemo(() => {
+    // 1. Prioritize the direct Telegram URL from the Mini App, if it hasn't failed yet.
+    if (telegramAvatar && !userAvatarError) {
+      return `${telegramAvatar}${telegramAvatar.includes("?") ? "&" : "?"}tgtop_avatar=${encodeURIComponent(telegramAvatarVersion ?? "current")}`;
+    }
+    // 2. If the direct URL failed or is missing, try the proxy or stored avatarUrl.
+    return (telegramUserId ? `/api/telegram-user-avatar/${telegramUserId}` : null) || user?.avatarUrl || null;
+  }, [telegramAvatar, userAvatarError, telegramAvatarVersion, telegramUserId, user?.avatarUrl]);
+
   useEffect(() => {
+    // Only reset the error state when the underlying user identity changes.
     setUserAvatarError(false);
-  }, [displayUserAvatar]);
+  }, [telegramUserId, user?.avatarUrl]);
   const userInitial = (
     userDisplayName.replace(/^@/, "").trim().slice(0, 1) ||
     userTelegramUsername?.replace(/^@/, "").trim().slice(0, 1) ||
@@ -3462,7 +3490,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       disabled={!managerPublic || !detail.group.managerUsername}
                       className="flex min-h-[38px] w-[76px] shrink-0 items-center gap-1.5 rounded-xl border border-[#354966] bg-[#202b3a] px-2 text-left text-slate-100 transition-colors hover:bg-[#253247] active:scale-[0.98] disabled:cursor-default"
                     >
-                      <SafeAvatar src={detail.group.managerAvatarUrl} fallback={<UserRound className="h-4 w-4 shrink-0 text-slate-400" />} className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                      <SafeAvatar src={detail.group.managerAvatarUrl} userId={detail.group.managerTelegramUserId} fallback={<UserRound className="h-4 w-4 shrink-0 text-slate-400" />} className="h-5 w-5 shrink-0 rounded-full object-cover" />
                       <b className="truncate text-[9px] leading-3">{detail.group.managerName ?? "Менеджер"}</b>
                     </button>}
                   </div>
@@ -3740,7 +3768,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                 <div className="rounded-2xl border border-white/8 bg-[#111720] p-5">
                   <div className="flex items-center gap-3">
                     <span className="grid h-12 w-12 overflow-hidden rounded-full border border-white/10 bg-[#1b2430] text-sm font-semibold">
-                      <SafeAvatar src={publicOwner.owner.avatarUrl} fallback={publicOwner.owner.name?.slice(0, 1).toUpperCase() ?? "T"} className="h-full w-full object-cover" />
+                      <SafeAvatar src={publicOwner.owner.avatarUrl} userId={publicOwner.owner.openId?.startsWith("telegram:") ? publicOwner.owner.openId.replace("telegram:", "") : null} fallback={publicOwner.owner.name?.slice(0, 1).toUpperCase() ?? "T"} className="h-full w-full object-cover" />
                     </span>
                     <span className="min-w-0">
                       <h1 className="truncate text-lg font-semibold">{publicOwner.owner.name ?? tx("Пользователь TG TOP", "TG TOP user")}</h1>
@@ -4153,7 +4181,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     return <button key={entry.owner.openId} onClick={() => openOwner(entry.owner.openId)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.025]">
                       <span className="w-5 text-center text-xs font-semibold text-[#72a8ff]">{entry.rank}</span>
                       <span className="grid h-8 w-8 overflow-hidden rounded-full border border-white/10 bg-[#1b2430] text-[10px] font-semibold">
-                        <SafeAvatar src={entry.owner.avatarUrl} fallback={ownerLabel.slice(0, 1).toUpperCase()} className="h-full w-full object-cover" />
+                        <SafeAvatar src={entry.owner.avatarUrl} userId={entry.owner.openId?.startsWith("telegram:") ? entry.owner.openId.replace("telegram:", "") : null} fallback={ownerLabel.slice(0, 1).toUpperCase()} className="h-full w-full object-cover" />
                       </span>
                       <span className="min-w-0 flex-1">
                         <b className="block truncate text-xs text-slate-200">{ownerLabel}</b>
@@ -4617,7 +4645,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                   const selected = managerPublic && admin.telegramUserId === selectedManagerTelegramUserId;
                   return (
                     <button key={admin.telegramUserId} type="button" onClick={() => { setSelectedManagerTelegramUserId(admin.telegramUserId); setManagerPublic(true); }} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors ${selected ? "border-[#3f8cff]/65 bg-[#3f8cff]/12" : "border-white/8 bg-white/[0.025] hover:bg-white/[0.055]"}`}>
-                      <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full border border-white/10 bg-[#1b2430] text-xs font-semibold text-slate-300"><SafeAvatar src={admin.avatarUrl} fallback={admin.name.slice(0, 1).toUpperCase()} className="h-full w-full object-cover" /></span>
+                      <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full border border-white/10 bg-[#1b2430] text-xs font-semibold text-slate-300"><SafeAvatar src={admin.avatarUrl} userId={admin.telegramUserId} fallback={admin.name.slice(0, 1).toUpperCase()} className="h-full w-full object-cover" /></span>
                       <span className="min-w-0 flex-1"><b className="block truncate text-sm text-slate-100">{admin.name}</b>{admin.username && <small className="mt-0.5 block truncate text-[10px] text-slate-500">@{admin.username}</small>}</span>
                       <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${selected ? "border-[#3f8cff] bg-[#3f8cff] text-white" : "border-white/20 text-transparent"}`}><Check className="h-3.5 w-3.5" /></span>
                     </button>
@@ -5147,7 +5175,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                 <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500">{tx("Получатель", "Recipient")}</span>
                 <div className="mt-2 flex items-center gap-3">
                   <span className="grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-[#1b2430] text-sm font-semibold text-slate-300">
-                    <SafeAvatar src={reviewedRecipient.avatarUrl} fallback={(reviewedRecipient.name ?? "T").slice(0, 1).toUpperCase()} className="h-full w-full object-cover" />
+                    <SafeAvatar src={reviewedRecipient.avatarUrl} userId={reviewedRecipient.openId?.startsWith("telegram:") ? reviewedRecipient.openId.replace("telegram:", "") : null} fallback={(reviewedRecipient.name ?? "T").slice(0, 1).toUpperCase()} className="h-full w-full object-cover" />
                   </span>
                   <span className="min-w-0">
                     <b className="block truncate text-sm text-slate-100">{reviewedRecipient.name ?? tx("Пользователь TG TOP", "TG TOP user")}</b>
