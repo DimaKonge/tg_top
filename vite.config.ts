@@ -1,10 +1,8 @@
-import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
-import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
 
 // =============================================================================
 // Manus Debug Collector - Vite Plugin
@@ -150,11 +148,26 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const isProd = process.env.NODE_ENV === "production";
+// Optional dev plugins
+let optionalDevPlugins: Plugin[] = [];
+if (process.env.NODE_ENV !== "production") {
+  try {
+    // @ts-ignore
+    const { jsxLocPlugin } = await import("@builder.io/vite-plugin-jsx-loc");
+    optionalDevPlugins.push(jsxLocPlugin());
+  } catch {}
+  try {
+    // @ts-ignore
+    const { vitePluginManusRuntime } = await import("vite-plugin-manus-runtime");
+    optionalDevPlugins.push(vitePluginManusRuntime());
+  } catch {}
+  optionalDevPlugins.push(vitePluginManusDebugCollector());
+}
+
 const plugins = [
   react(),
   tailwindcss(),
-  ...(isProd ? [] : [jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()]),
+  ...optionalDevPlugins,
 ];
 
 export default defineConfig({

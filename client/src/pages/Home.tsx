@@ -1937,20 +1937,23 @@ export default function Home({ onReady }: { onReady?: () => void }) {
     tx("Пользователь Telegram", "Telegram user");
   const userTelegramUsername = telegramUser?.username || user?.telegramUsername || null;
 
-    const [userAvatarStage, setUserAvatarStage] = useState(0); // 0: direct, 1: proxy, 2: initials
+    const [userAvatarStage, setUserAvatarStage] = useState(0); // 0: direct, 1: proxy, 2: username, 3: initials
 
   const displayUserAvatar = useMemo(() => {
     const directUrl = telegramAvatar ? `${telegramAvatar}${telegramAvatar.includes("?") ? "&" : "?"}tgtop_avatar=${encodeURIComponent(telegramAvatarVersion ?? "current")}` : null;
     const proxyUrl = (telegramUserId ? `/api/telegram-user-avatar/${telegramUserId}` : null) || user?.avatarUrl || null;
+    const username = (userTelegramUsername || telegramUser?.username)?.replace(/^@/, "").trim();
+    const usernameUrl = username ? `https://t.me/i/userpic/320/${encodeURIComponent(username)}.jpg` : null;
     
-    if (userAvatarStage === 0) return directUrl || proxyUrl;
-    if (userAvatarStage === 1) return directUrl ? proxyUrl : null;
+    if (userAvatarStage === 0) return directUrl || proxyUrl || usernameUrl;
+    if (userAvatarStage === 1) return proxyUrl || usernameUrl || directUrl;
+    if (userAvatarStage === 2) return usernameUrl || proxyUrl;
     return null;
-  }, [telegramAvatar, userAvatarStage, telegramAvatarVersion, telegramUserId, user?.avatarUrl]);
+  }, [telegramAvatar, userAvatarStage, telegramAvatarVersion, telegramUserId, user?.avatarUrl, userTelegramUsername, telegramUser?.username]);
 
   useEffect(() => {
     setUserAvatarStage(0);
-  }, [telegramUserId, user?.avatarUrl]);
+  }, [telegramUserId, user?.avatarUrl, telegramAvatar]);
 
   const userInitial = (
     userDisplayName.replace(/^@/, "").trim().slice(0, 1) ||
@@ -1961,7 +1964,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
   const renderUserAvatar = (size: "sm" | "md") => {
     const isSm = size === "sm";
     const sizeClasses = isSm ? "h-9 w-9 text-xs" : "h-12 w-12 text-base";
-    const hasPhoto = Boolean(displayUserAvatar) && userAvatarStage < 2;
+    const hasPhoto = Boolean(displayUserAvatar) && userAvatarStage < 3;
 
     return (
       <span

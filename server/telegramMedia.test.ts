@@ -3,6 +3,7 @@ import {
   detectSafeTelegramAvatarContentType,
   getTelegramAvatarTokens,
   isValidTelegramAvatarChatId,
+  isValidTelegramUserId,
 } from "./telegramMedia";
 
 describe("Telegram avatar tokens", () => {
@@ -34,5 +35,12 @@ describe("Telegram avatar tokens", () => {
   it("keeps chat id validation strict", () => {
     expect(isValidTelegramAvatarChatId("-1001708382303")).toBe(true);
     expect(isValidTelegramAvatarChatId("../../etc/passwd")).toBe(false);
+  });
+
+  it("validates telegram user IDs strictly", () => {
+    expect(isValidTelegramUserId("123456789")).toBe(true);
+    expect(isValidTelegramUserId("abc")).toBe(false);
+    expect(isValidTelegramUserId("-123")).toBe(false);
+    expect(isValidTelegramUserId("")).toBe(false);
   });
 });

@@ -29,7 +29,12 @@ export async function createContext(
         const openId = `telegram:${telegramUser.id}`;
         const telegramFullName = [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(" ").trim();
         const name = telegramFullName || telegramUser.username || `User ${telegramUser.id}`;
-        const avatarUrl = telegramUser.photo_url || `/api/telegram-user-avatar/${telegramUser.id}`;
+        const existingUser = await getUserByOpenId(openId);
+        const avatarUrl =
+          telegramUser.photo_url ||
+          (telegramUser.username ? `https://t.me/i/userpic/320/${telegramUser.username}.jpg` : null) ||
+          (existingUser?.avatarUrl && !existingUser.avatarUrl.startsWith("/api/telegram-user-avatar") ? existingUser.avatarUrl : null) ||
+          `/api/telegram-user-avatar/${telegramUser.id}`;
         await upsertUser({
           openId,
           name,

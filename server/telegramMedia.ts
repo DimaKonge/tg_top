@@ -1,11 +1,11 @@
 import type { Express } from "express";
 import axios from "axios";
-import { getGroupByChatId } from "./db";
+import { getGroupByChatId, getUserByOpenId } from "./db";
 import { BoundedTtlCache, InFlightRequestCoalescer } from "./resourceCache";
 
 const MAX_TELEGRAM_AVATAR_BYTES = 1_500_000;
 const AVATAR_CACHE_TTL_MS = 10 * 60_000;
-const AVATAR_NOT_FOUND_CACHE_TTL_MS = 60_000;
+const AVATAR_NOT_FOUND_CACHE_TTL_MS = 15_000;
 
 type TelegramAvatarResult =
   | { kind: "image"; body: Buffer; contentType: string }
@@ -66,34 +66,78 @@ async function loadTelegramAvatar(chatId: string): Promise<TelegramAvatarResult>
     const tokens = getTelegramAvatarTokens(process.env.TELEGRAM_BOT_TOKEN, process.env.TELEGRAM_RESERVE_BOT_TOKEN);
     for (const token of tokens) {
       try {
-        // Existing catalog rows may predate avatar persistence or may have been
-        // updated with a null photo. Recover the current channel photo directly
-        // from Telegram before declaring the avatar unavailable.
         let fileId = group.avatarFileId;
+        if (fileId) {
+          try {
+            const fileResult = await axios.get<{ ok: boolean; result: { file_path: string } }>(`https://api.telegram.org/bot${token}/getFile`, {
+              params: { file_id: fileId }, timeout: 6_000, maxContentLength: 64_000, maxBodyLength: 64_000,
+            });
+            if (fileResult.data.ok && fileResult.data.result?.file_path) {
+              const image = await axios.get<ArrayBuffer>(`https://api.telegram.org/file/bot${token}/${fileResult.data.result.file_path}`, {
+                responseType: "arraybuffer", timeout: 10_000, maxContentLength: MAX_TELEGRAM_AVATAR_BYTES, maxBodyLength: MAX_TELEGRAM_AVATAR_BYTES,
+              });
+              const body = Buffer.from(image.data);
+              const contentType = detectSafeTelegramAvatarContentType(body, image.headers["content-type"], fileResult.data.result.file_path);
+              if (contentType) {
+                const result = { kind: "image", body, contentType } as const;
+                avatarCache.set(chatId, result, AVATAR_CACHE_TTL_MS);
+                return result;
+              }
+            }
+          } catch {
+            fileId = null;
+          }
+        }
         if (!fileId) {
           const chatResult = await axios.get<{ ok: boolean; result?: { photo?: { small_file_id?: string } } }>(`https://api.telegram.org/bot${token}/getChat`, {
-            params: { chat_id: chatId }, timeout: 8_000, maxContentLength: 64_000, maxBodyLength: 64_000,
+            params: { chat_id: chatId }, timeout: 6_000, maxContentLength: 64_000, maxBodyLength: 64_000,
           });
           fileId = chatResult.data.ok ? chatResult.data.result?.photo?.small_file_id ?? null : null;
+          if (fileId) {
+            const fileResult = await axios.get<{ ok: boolean; result: { file_path: string } }>(`https://api.telegram.org/bot${token}/getFile`, {
+              params: { file_id: fileId }, timeout: 6_000, maxContentLength: 64_000, maxBodyLength: 64_000,
+            });
+            if (fileResult.data.ok && fileResult.data.result?.file_path) {
+              const image = await axios.get<ArrayBuffer>(`https://api.telegram.org/file/bot${token}/${fileResult.data.result.file_path}`, {
+                responseType: "arraybuffer", timeout: 10_000, maxContentLength: MAX_TELEGRAM_AVATAR_BYTES, maxBodyLength: MAX_TELEGRAM_AVATAR_BYTES,
+              });
+              const body = Buffer.from(image.data);
+              const contentType = detectSafeTelegramAvatarContentType(body, image.headers["content-type"], fileResult.data.result.file_path);
+              if (contentType) {
+                const result = { kind: "image", body, contentType } as const;
+                avatarCache.set(chatId, result, AVATAR_CACHE_TTL_MS);
+                return result;
+              }
+            }
+          }
         }
-        if (!fileId) continue;
-        const fileResult = await axios.get<{ ok: boolean; result: { file_path: string } }>(`https://api.telegram.org/bot${token}/getFile`, {
-          params: { file_id: fileId }, timeout: 8_000, maxContentLength: 64_000, maxBodyLength: 64_000,
-        });
-        if (!fileResult.data.ok || !fileResult.data.result.file_path) continue;
-        const image = await axios.get<ArrayBuffer>(`https://api.telegram.org/file/bot${token}/${fileResult.data.result.file_path}`, {
-          responseType: "arraybuffer", timeout: 12_000, maxContentLength: MAX_TELEGRAM_AVATAR_BYTES, maxBodyLength: MAX_TELEGRAM_AVATAR_BYTES,
-        });
-        const body = Buffer.from(image.data);
-        const contentType = detectSafeTelegramAvatarContentType(body, image.headers["content-type"], fileResult.data.result.file_path);
-        if (!contentType) continue;
-        const result = { kind: "image", body, contentType } as const;
-        avatarCache.set(chatId, result, AVATAR_CACHE_TTL_MS);
-        return result;
       } catch {
         // Telegram file identifiers are bot-specific, so try the reserve bot next.
       }
     }
+
+    // Fallback: If channel has a username, Telegram hosts a public picture at t.me/i/userpic/320/username.jpg
+    if (group.username) {
+      try {
+        const cleanUsername = group.username.replace(/^@/, "").trim();
+        const image = await axios.get<ArrayBuffer>(`https://t.me/i/userpic/320/${encodeURIComponent(cleanUsername)}.jpg`, {
+          responseType: "arraybuffer",
+          timeout: 6_000,
+          maxContentLength: MAX_TELEGRAM_AVATAR_BYTES,
+          maxBodyLength: MAX_TELEGRAM_AVATAR_BYTES,
+        });
+        const body = Buffer.from(image.data);
+        const contentType = detectSafeTelegramAvatarContentType(body, image.headers["content-type"], `${cleanUsername}.jpg`);
+        if (contentType) {
+          const result = { kind: "image", body, contentType } as const;
+          avatarCache.set(chatId, result, AVATAR_CACHE_TTL_MS);
+          return result;
+        }
+      } catch {
+        // Ignore and fall through
+      }
+    }
+
     const missing = { kind: "not-found" } as const;
     avatarCache.set(chatId, missing, AVATAR_NOT_FOUND_CACHE_TTL_MS);
     return missing;
@@ -107,23 +151,74 @@ async function loadTelegramUserAvatar(userId: string): Promise<TelegramAvatarRes
   return avatarRequests.run(cacheKey, async () => {
     const secondCached = avatarCache.get(cacheKey);
     if (secondCached) return secondCached;
+
+    // 1. Look up user in database: if they have a known external avatarUrl or username, fetch it
+    try {
+      const user = await getUserByOpenId(`telegram:${userId}`);
+      if (user) {
+        if (user.avatarUrl && /^https?:\/\//i.test(user.avatarUrl) && !user.avatarUrl.includes("/api/telegram-user-avatar/")) {
+          try {
+            const image = await axios.get<ArrayBuffer>(user.avatarUrl, {
+              responseType: "arraybuffer",
+              timeout: 6_000,
+              maxContentLength: MAX_TELEGRAM_AVATAR_BYTES,
+              maxBodyLength: MAX_TELEGRAM_AVATAR_BYTES,
+            });
+            const body = Buffer.from(image.data);
+            const contentType = detectSafeTelegramAvatarContentType(body, image.headers["content-type"], user.avatarUrl);
+            if (contentType) {
+              const result = { kind: "image", body, contentType } as const;
+              avatarCache.set(cacheKey, result, AVATAR_CACHE_TTL_MS);
+              return result;
+            }
+          } catch {
+            // Continue
+          }
+        }
+
+        if (user.telegramUsername) {
+          try {
+            const cleanUsername = user.telegramUsername.replace(/^@/, "").trim();
+            const image = await axios.get<ArrayBuffer>(`https://t.me/i/userpic/320/${encodeURIComponent(cleanUsername)}.jpg`, {
+              responseType: "arraybuffer",
+              timeout: 6_000,
+              maxContentLength: MAX_TELEGRAM_AVATAR_BYTES,
+              maxBodyLength: MAX_TELEGRAM_AVATAR_BYTES,
+            });
+            const body = Buffer.from(image.data);
+            const contentType = detectSafeTelegramAvatarContentType(body, image.headers["content-type"], `${cleanUsername}.jpg`);
+            if (contentType) {
+              const result = { kind: "image", body, contentType } as const;
+              avatarCache.set(cacheKey, result, AVATAR_CACHE_TTL_MS);
+              return result;
+            }
+          } catch {
+            // Continue
+          }
+        }
+      }
+    } catch {
+      // Ignore db errors and proceed to Bot API
+    }
+
+    // 2. Try Bot API getUserProfilePhotos
     const tokens = getTelegramAvatarTokens(process.env.TELEGRAM_BOT_TOKEN, process.env.TELEGRAM_RESERVE_BOT_TOKEN);
     for (const token of tokens) {
       try {
         const photosRes = await axios.get<{ ok: boolean; result?: { photos?: Array<Array<{ file_id: string }>> } }>(
           `https://api.telegram.org/bot${token}/getUserProfilePhotos`,
-          { params: { user_id: Number(userId), limit: 1 }, timeout: 8_000, maxContentLength: 64_000, maxBodyLength: 64_000 }
+          { params: { user_id: Number(userId), limit: 1 }, timeout: 6_000, maxContentLength: 64_000, maxBodyLength: 64_000 }
         );
         const fileId = photosRes.data.ok ? photosRes.data.result?.photos?.[0]?.slice(-1)[0]?.file_id : null;
         if (!fileId) continue;
         const fileResult = await axios.get<{ ok: boolean; result: { file_path: string } }>(
           `https://api.telegram.org/bot${token}/getFile`,
-          { params: { file_id: fileId }, timeout: 8_000, maxContentLength: 64_000, maxBodyLength: 64_000 }
+          { params: { file_id: fileId }, timeout: 6_000, maxContentLength: 64_000, maxBodyLength: 64_000 }
         );
         if (!fileResult.data.ok || !fileResult.data.result.file_path) continue;
         const image = await axios.get<ArrayBuffer>(
           `https://api.telegram.org/file/bot${token}/${fileResult.data.result.file_path}`,
-          { responseType: "arraybuffer", timeout: 12_000, maxContentLength: MAX_TELEGRAM_AVATAR_BYTES, maxBodyLength: MAX_TELEGRAM_AVATAR_BYTES }
+          { responseType: "arraybuffer", timeout: 10_000, maxContentLength: MAX_TELEGRAM_AVATAR_BYTES, maxBodyLength: MAX_TELEGRAM_AVATAR_BYTES }
         );
         const body = Buffer.from(image.data);
         const contentType = detectSafeTelegramAvatarContentType(body, image.headers["content-type"], fileResult.data.result.file_path);
@@ -135,11 +230,14 @@ async function loadTelegramUserAvatar(userId: string): Promise<TelegramAvatarRes
         // Try next token
       }
     }
-    // Last resort: try the User Agent (MTProto worker) which has broader access
-    // than the Bot API for profile photos.
+
+    // 3. User Agent (MTProto worker) with safe timeout
     try {
       const { fetchTelegramUserProfilePhoto } = await import("./telegramUserAgent");
-      const body = await fetchTelegramUserProfilePhoto(userId);
+      const body = await Promise.race([
+        fetchTelegramUserProfilePhoto(userId),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 3000)),
+      ]);
       if (body) {
         const contentType = detectSafeTelegramAvatarContentType(body, "image/jpeg", "avatar.jpg");
         if (contentType) {
@@ -164,7 +262,7 @@ export function registerTelegramMediaRoutes(app: Express) {
     if (!isValidTelegramAvatarChatId(chatId)) return res.status(400).end();
     try {
       const avatar = await loadTelegramAvatar(chatId);
-      if (avatar.kind === "not-found") return res.status(404).setHeader("Cache-Control", "public, max-age=60").end();
+      if (avatar.kind === "not-found") return res.status(404).setHeader("Cache-Control", "public, max-age=15").end();
       res.setHeader("Cache-Control", "public, max-age=600, stale-while-revalidate=600");
       res.setHeader("Content-Type", avatar.contentType);
       return res.send(avatar.body);
@@ -178,7 +276,7 @@ export function registerTelegramMediaRoutes(app: Express) {
     if (!isValidTelegramUserId(userId)) return res.status(400).end();
     try {
       const avatar = await loadTelegramUserAvatar(userId);
-      if (avatar.kind === "not-found") return res.status(404).setHeader("Cache-Control", "public, max-age=60").end();
+      if (avatar.kind === "not-found") return res.status(404).setHeader("Cache-Control", "public, max-age=15").end();
       res.setHeader("Cache-Control", "public, max-age=600, stale-while-revalidate=600");
       res.setHeader("Content-Type", avatar.contentType);
       return res.send(avatar.body);
