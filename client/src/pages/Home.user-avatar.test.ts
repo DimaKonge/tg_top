@@ -10,5 +10,13 @@ describe("TG TOP Telegram user avatar sync", () => {
     expect(source).toContain("user?.avatarUrl");
     expect(source).not.toContain("user?.avatarUrl ?? telegramAvatar");
     expect(source).toContain("src={displayUserAvatar}");
+    expect(source).toContain("function SafeAvatar");
+    expect(source).toContain("onError={() => setFailed(true)}");
+    expect(source).toContain("useEffect(() => setFailed(false), [src])");
+    expect(source).toContain("SafeAvatar src={detail.group.managerAvatarUrl}");
+    expect(source).toContain("SafeAvatar src={publicOwner.owner.avatarUrl}");
+    expect(source).toContain("SafeAvatar src={entry.owner.avatarUrl}");
+    expect(source).toContain("SafeAvatar src={admin.avatarUrl}");
+    expect(source).toContain("SafeAvatar src={reviewedRecipient.avatarUrl}");
   });
 });
