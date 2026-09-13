@@ -781,7 +781,7 @@ async function awardMembershipReward(membership: ChatMemberUpdate): Promise<void
         });
     if (result.awarded) {
       console.info(`[Telegram] Awarded ${result.amount / 100} GRAM for ${rewardLinkTelegramId || (viaInviteLink && linkCreator && !linkCreator.is_bot) ? "channel referral" : "channel subscription"} in ${chatId}`);
-      await notifyRewardCredited({ telegramUserId: result.beneficiaryTelegramId, groupTitle: result.groupTitle, amount: result.amount });
+      await notifyRewardCredited({ telegramUserId: result.beneficiaryTelegramId, groupTitle: result.groupTitle, amount: result.amount, reason: "подписка на канал" });
     }
     return;
   }
@@ -811,7 +811,7 @@ async function awardMembershipReward(membership: ChatMemberUpdate): Promise<void
         : undefined;
     if (result?.awarded) {
       console.info(`[Telegram] Awarded ${result.amount / 100} GRAM for ${rewardLinkTelegramId ? "tracked group join" : "manual chat addition"} in ${chatId}`);
-      await notifyRewardCredited({ telegramUserId: result.beneficiaryTelegramId, groupTitle: result.groupTitle, amount: result.amount });
+      await notifyRewardCredited({ telegramUserId: result.beneficiaryTelegramId, groupTitle: result.groupTitle, amount: result.amount, reason: "вступление в группу" });
     }
   }
 }
