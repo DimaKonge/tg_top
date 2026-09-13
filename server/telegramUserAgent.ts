@@ -307,7 +307,10 @@ export async function fetchTelegramGroupProfileMedia(chatId: string, groupId: nu
 export async function fetchTelegramUserProfilePhoto(userId: string): Promise<Buffer | null> {
   const { client } = await openConnectedTelegramUserAgentClientForWorker();
   try {
-    const media = await client.downloadProfilePhoto(userId);
+    // 1. Resolve the entity first to ensure we have the correct access.
+    const entity = await client.getEntity(userId);
+    // 2. Download the small version (isBig: false) for the avatar proxy.
+    const media = await client.downloadProfilePhoto(entity, { isBig: false });
     if (Buffer.isBuffer(media) && media.length > 0) {
       await persistConnectedTelegramUserAgentClientSession(client);
       return media;
