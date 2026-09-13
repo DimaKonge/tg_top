@@ -118,6 +118,14 @@ export async function emulateTonPayoutFee(boc: string) {
     trace?: { transaction?: { total_fees?: string | number | null } };
     transactions?: Array<{ total_fees?: string | number | null }>;
   };
+  const success = payload.transaction?.success
+    ?? payload.trace?.transaction?.success
+    ?? payload.transactions?.[0]?.success;
+  
+  if (success === false) {
+    throw new Error("Транзакция завершится ошибкой (вероятно, недостаточно средств на горячем кошельке)");
+  }
+
   const value = payload.transaction?.total_fees
     ?? payload.trace?.transaction?.total_fees
     ?? payload.transactions?.[0]?.total_fees;
