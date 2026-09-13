@@ -66,7 +66,10 @@ queryClient.getQueryCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.query.state.error;
     redirectToLoginIfUnauthorized(error);
-    console.error("[API Query Error]", error);
+    // Don't flood console with expected background retries or offline states
+    if (event.query.state.status === "error") {
+      console.error("[API Query Error]", error);
+    }
   }
 });
 
@@ -111,7 +114,7 @@ const trpcClient = trpc.createClient({
       fetch(input, init) {
         return globalThis.fetch(input, {
           ...(init ?? {}),
-          credentials: "include",
+          credentials: "same-origin",
         });
       },
     }),
