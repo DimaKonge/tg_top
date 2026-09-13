@@ -1937,30 +1937,31 @@ export default function Home({ onReady }: { onReady?: () => void }) {
     tx("Пользователь Telegram", "Telegram user");
   const userTelegramUsername = telegramUser?.username || user?.telegramUsername || null;
 
-  const [userAvatarError, setUserAvatarError] = useState(false);
+    const [userAvatarStage, setUserAvatarStage] = useState(0); // 0: direct, 1: proxy, 2: initials
 
   const displayUserAvatar = useMemo(() => {
-    // 1. Prioritize the direct Telegram URL from the Mini App, if it hasn't failed yet.
-    if (telegramAvatar && !userAvatarError) {
-      return `${telegramAvatar}${telegramAvatar.includes("?") ? "&" : "?"}tgtop_avatar=${encodeURIComponent(telegramAvatarVersion ?? "current")}`;
-    }
-    // 2. If the direct URL failed or is missing, try the proxy or stored avatarUrl.
-    return (telegramUserId ? `/api/telegram-user-avatar/${telegramUserId}` : null) || user?.avatarUrl || null;
-  }, [telegramAvatar, userAvatarError, telegramAvatarVersion, telegramUserId, user?.avatarUrl]);
+    const directUrl = telegramAvatar ? `${telegramAvatar}${telegramAvatar.includes("?") ? "&" : "?"}tgtop_avatar=${encodeURIComponent(telegramAvatarVersion ?? "current")}` : null;
+    const proxyUrl = (telegramUserId ? `/api/telegram-user-avatar/${telegramUserId}` : null) || user?.avatarUrl || null;
+    
+    if (userAvatarStage === 0) return directUrl || proxyUrl;
+    if (userAvatarStage === 1) return directUrl ? proxyUrl : null;
+    return null;
+  }, [telegramAvatar, userAvatarStage, telegramAvatarVersion, telegramUserId, user?.avatarUrl]);
 
   useEffect(() => {
-    // Only reset the error state when the underlying user identity changes.
-    setUserAvatarError(false);
+    setUserAvatarStage(0);
   }, [telegramUserId, user?.avatarUrl]);
+
   const userInitial = (
     userDisplayName.replace(/^@/, "").trim().slice(0, 1) ||
     userTelegramUsername?.replace(/^@/, "").trim().slice(0, 1) ||
     "T"
   ).toUpperCase();
+  
   const renderUserAvatar = (size: "sm" | "md") => {
     const isSm = size === "sm";
     const sizeClasses = isSm ? "h-9 w-9 text-xs" : "h-12 w-12 text-base";
-    const hasPhoto = Boolean(displayUserAvatar) && !userAvatarError;
+    const hasPhoto = Boolean(displayUserAvatar) && userAvatarStage < 2;
 
     return (
       <span
@@ -1968,11 +1969,12 @@ export default function Home({ onReady }: { onReady?: () => void }) {
       >
         {hasPhoto && displayUserAvatar ? (
           <img
+            key={displayUserAvatar}
             src={displayUserAvatar}
             alt=""
             referrerPolicy="no-referrer"
             className="h-full w-full object-cover"
-            onError={() => setUserAvatarError(true)}
+            onError={() => setUserAvatarStage(prev => prev + 1)}
           />
         ) : (
           <span className="grid h-full w-full place-items-center bg-gradient-to-br from-[#2563eb] via-[#1d4ed8] to-[#0f172a] text-white font-bold drop-shadow-sm select-none">
