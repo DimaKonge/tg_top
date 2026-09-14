@@ -504,6 +504,14 @@ export async function getUserByOpenId(openId: string) {
   return result[0];
 }
 
+export async function getUserByTelegramUsername(telegramUsername: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const username = telegramUsername.replace(/^@/, "").trim();
+  const result = await db.select().from(users).where(eq(users.telegramUsername, username)).limit(1);
+  return result[0];
+}
+
 export async function setPublicProfile(openId: string, publicProfile: boolean) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

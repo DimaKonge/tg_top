@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import axios from "axios";
-import { getGroupByChatId, getUserByOpenId } from "./db";
+import { getGroupByChatId, getUserByOpenId, getUserByTelegramUsername } from "./db";
 import { BoundedTtlCache, InFlightRequestCoalescer } from "./resourceCache";
 
 const MAX_TELEGRAM_AVATAR_BYTES = 1_500_000;
@@ -24,6 +24,11 @@ export function isValidTelegramAvatarChatId(chatId: string): boolean {
 
 export function isValidTelegramUserId(userId: string): boolean {
   return /^\d{1,32}$/.test(userId);
+}
+
+export function isValidTelegramUserIdentifier(identifier: string): boolean {
+  const clean = identifier.replace(/^@/, "").trim();
+  return /^(?:\d{1,32}|[a-zA-Z0-9_]{3,64})$/.test(clean);
 }
 
 export function isSafeTelegramAvatarContentType(contentType: unknown): contentType is string {

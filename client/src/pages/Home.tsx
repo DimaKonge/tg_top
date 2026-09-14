@@ -1,3 +1,10 @@
+import { GiveawayCreateSheet } from "@/components/giveaways/GiveawayCreateSheet";
+import { BotListingSheet } from "@/components/bots/BotListingSheet";
+import { BotCategorySheet } from "@/components/bots/BotCategorySheet";
+import { NftInstallmentSheet } from "@/components/nft/NftInstallmentSheet";
+import { NftRentalSheet } from "@/components/nft/NftRentalSheet";
+import { NftBuySheet } from "@/components/nft/NftBuySheet";
+import { NftListingSheet } from "@/components/nft/NftListingSheet";
 import { UserAvatar, useUserAvatarInfo } from "@/components/UserAvatar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { closestCenter, DndContext, DragOverlay, KeyboardSensor, PointerSensor, type DragEndEvent, type DragStartEvent, useSensor, useSensors } from "@dnd-kit/core";
@@ -303,7 +310,7 @@ function WalletConnectControl({ language, balanceTon, variant = "compact", owner
   return <button disabled={!restored} onClick={openWalletForOwner} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#3f8cff]/35 bg-[#3f8cff]/10 px-2.5 text-[11px] font-medium text-[#a6c8ff] disabled:opacity-60"><WalletCards className="h-3.5 w-3.5" />{restored ? <><span>{label}</span>{address && <span className="rounded-md bg-[#0b0f14]/70 px-1.5 py-0.5 text-[10px] text-white">{balanceTon} GRAM</span>}</> : language === "en" ? "Loading…" : "Загрузка…"}</button>;
 }
 
-function WalletNftCard({ item, language }: { item: WalletNft; language: Language }) {
+function WalletNftCard({ item, language, onList }: { item: WalletNft; language: Language; onList?: (nft: WalletNft) => void }) {
   const [imageFailed, setImageFailed] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
   const categoryLabel: Record<WalletNft["category"], string> = {
@@ -333,9 +340,22 @@ function WalletNftCard({ item, language }: { item: WalletNft; language: Language
       {imageUrl && !imageFailed ? item.mediaKind === "video" && imageIndex === 0 ? <video src={imageUrl} autoPlay muted loop playsInline className="h-full w-full object-cover" onError={tryNextImage} /> : <img src={imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" onError={tryNextImage} /> : <span className="grid h-full w-full place-items-center bg-[radial-gradient(circle_at_30%_20%,rgba(84,143,255,.32),transparent 42%),#152131] text-lg font-semibold text-[#aacaff]">{item.name.slice(0, 1).toUpperCase()}</span>}
       <span className={`absolute left-1.5 top-1.5 rounded-md border px-1.5 py-1 text-[8px] font-semibold backdrop-blur-sm ${categoryClass[item.category]}`}>{categoryLabel[item.category]}</span>
     </div>
-    <b className="mt-2 block truncate text-[11px] text-slate-100">{item.name}</b>
-    <small className="mt-0.5 block truncate text-[9px] text-slate-500">{item.collectionName ?? categoryLabel[item.category]}</small>
-    <small className="mt-1 block truncate font-mono text-[8px] text-slate-600">{shortAddress}</small>
+    <div className="mt-2.5 flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        <b className="block truncate text-[11px] text-slate-100">{item.name}</b>
+        <small className="mt-0.5 block truncate text-[9px] text-slate-500">{item.collectionName ?? categoryLabel[item.category]}</small>
+      </div>
+      {onList && (
+        <button
+          type="button"
+          onClick={() => onList(item)}
+          className="shrink-0 rounded-lg border border-[#3f8cff]/35 bg-[#3f8cff]/10 px-2.5 py-1.5 text-[10px] font-semibold text-[#a6c8ff] transition-colors hover:bg-[#3f8cff]/18 active:scale-[0.98]"
+        >
+          {language === "en" ? "List NFT" : "Выставить"}
+        </button>
+      )}
+    </div>
+    <small className="mt-1.5 block truncate font-mono text-[8px] text-slate-600">{shortAddress}</small>
   </article>;
 }
 
@@ -656,7 +676,6 @@ export default function Home({ onReady }: { onReady?: () => void }) {
   const [nftMarketCategory, setNftMarketCategory] = useState<NftMarketCategory>("all");
   const [nftDealCategory, setNftDealCategory] = useState<NftDealCategory>("all");
   const [nftFilterOpen, setNftFilterOpen] = useState(false);
-  const [botCategory, setBotCategory] = useState("Все");
   const [channelGiftsOpen, setChannelGiftsOpen] = useState(false);
   const [selectedNftId, setSelectedNftId] = useState<number | null>(null);
   const [recipientInput, setRecipientInput] = useState("");
@@ -830,12 +849,6 @@ export default function Home({ onReady }: { onReady?: () => void }) {
   const [myGroupsSearchQuery, setMyGroupsSearchQuery] = useState("");
   const [myGroupsAddOpen, setMyGroupsAddOpen] = useState(false);
   const [giveawayCreateOpen, setGiveawayCreateOpen] = useState(false);
-  const [giveawayGroupId, setGiveawayGroupId] = useState("");
-  const [giveawayTitle, setGiveawayTitle] = useState("");
-  const [giveawayPrizeTitle, setGiveawayPrizeTitle] = useState("");
-  const [giveawayRules, setGiveawayRules] = useState("");
-  const [giveawayEndsAt, setGiveawayEndsAt] = useState("");
-  const [giveawayBoostOnly, setGiveawayBoostOnly] = useState(false);
   const [myGroupsDragActiveId, setMyGroupsDragActiveId] = useState<number | null>(null);
   const myGroupsSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { delay: 320, tolerance: 10 } }),
@@ -922,6 +935,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
     cities: Array<{ id: number; countryCode: string; code: string; label: string; sortOrder: number }>;
     topics: Array<{ id: number; category: "Каналы" | "Чаты" | "Боты"; code: string; label: string; sortOrder: number }>;
   } | undefined;
+  const [botCategory, setBotCategory] = useState("Все");
   const approvedBotsQuery = trpc.tgTop.getApprovedBots.useQuery(
     { category: botCategory === "Все" ? undefined : botCategory },
     { enabled: topSection === "bots" }
@@ -1008,7 +1022,6 @@ export default function Home({ onReady }: { onReady?: () => void }) {
   const [catalogTopicCategoryDraft, setCatalogTopicCategoryDraft] = useState<"Каналы" | "Чаты" | "Боты">("Каналы");
   const [catalogTopicCodeDraft, setCatalogTopicCodeDraft] = useState("");
   const [catalogTopicLabelDraft, setCatalogTopicLabelDraft] = useState("");
-  const [botTelegramLinkDraft, setBotTelegramLinkDraft] = useState("");
   const [botModerationDrafts, setBotModerationDrafts] = useState<Record<number, { category: string; reason: string }>>({});
   useEffect(() => {
     if (!referralAdmin?.config) return;
@@ -1028,6 +1041,8 @@ export default function Home({ onReady }: { onReady?: () => void }) {
   const [botListingSheetOpen, setBotListingSheetOpen] = useState(false);
   const [nftListingSheetOpen, setNftListingSheetOpen] = useState(false);
   const [nftListingUsername, setNftListingUsername] = useState("");
+  const [nftListingAssetClass, setNftListingAssetClass] = useState<"onchain" | "offchain">("offchain");
+  const [nftListingItemAddress, setNftListingItemAddress] = useState("");
   const [nftListingSaleEnabled, setNftListingSaleEnabled] = useState(true);
   const [nftListingRentEnabled, setNftListingRentEnabled] = useState(false);
   const [nftListingInstallmentsEnabled, setNftListingInstallmentsEnabled] = useState(false);
@@ -1276,18 +1291,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
     },
     onError: error => toast.error(error.message),
   });
-  const submitBotListing = trpc.tgTop.submitBotListing.useMutation({
-    onSuccess: () => {
-      toast.success(tx("Заявка на бота отправлена на ручную проверку", "Bot submission sent for manual review"));
-      setBotTelegramLinkDraft("");
-      setBotListingSheetOpen(false);
-      void utils.tgTop.myBotListings.invalidate();
-      void utils.tgTop.getBotModerationQueue.invalidate();
-      void utils.tgTop.getAllBotListings.invalidate();
-    },
-    onError: error => toast.error(error.message),
-  });
-  const moderateBotListing = trpc.tgTop.moderateBotListing.useMutation({
+    const moderateBotListing = trpc.tgTop.moderateBotListing.useMutation({
     onSuccess: result => {
       toast.success(result.moderationStatus === "approved" ? "Бот одобрен и опубликован" : "Заявка на бота отклонена");
       setBotModerationDrafts(current => {
@@ -1459,21 +1463,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
     },
     onError: error => toast.error(error.message),
   });
-  const createGiveaway = trpc.tgTop.createGiveaway.useMutation({
-    onSuccess: () => {
-      setGiveawayCreateOpen(false);
-      setGiveawayGroupId("");
-      setGiveawayTitle("");
-      setGiveawayPrizeTitle("");
-      setGiveawayRules("");
-      setGiveawayEndsAt("");
-      setGiveawayBoostOnly(false);
-      void utils.tgTop.openGiveaways.invalidate();
-      toast.success("Розыгрыш опубликован");
-    },
-    onError: error => toast.error(error.message),
-  });
-  const joinGiveaway = trpc.tgTop.joinGiveaway.useMutation({
+    const joinGiveaway = trpc.tgTop.joinGiveaway.useMutation({
     onSuccess: () => {
       void utils.tgTop.openGiveaways.invalidate();
       toast.success("Вы участвуете в розыгрыше");
@@ -1598,6 +1588,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
       setShowcaseNftId(null);
       void utils.tgTop.myNfts.invalidate();
       void utils.tgTop.getNfts.invalidate();
+                    utils.tgTop.myDeals.invalidate();
       void utils.tgTop.getGroupDetail.invalidate();
       void utils.tgTop.getPublicOwnerProfile.invalidate();
     },
@@ -1642,6 +1633,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
       toast.success(tx(`Заявка на аренду @${result.nft.username} создана. Сейф-контракт готов к привязке.`, `Rental request for @${result.nft.username} created. Vault contract ready for link.`));
       void utils.tgTop.myDeals.invalidate();
       void utils.tgTop.getNfts.invalidate();
+                    utils.tgTop.myDeals.invalidate();
     },
     onError: error => toast.error(error.message),
   });
@@ -1651,6 +1643,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
       setNftListingSheetOpen(false);
       setNftListingUsername("");
       void utils.tgTop.getNfts.invalidate();
+                    utils.tgTop.myDeals.invalidate();
     },
     onError: error => toast.error(error.message),
   });
@@ -1661,6 +1654,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
       toast.success(tx(`Безопасная сделка на покупку @${result.nft.username} открыта. Эскроу защищает обе стороны.`, `Secure purchase deal for @${result.nft.username} created. Escrow protects both parties.`));
       void utils.tgTop.myDeals.invalidate();
       void utils.tgTop.getNfts.invalidate();
+                    utils.tgTop.myDeals.invalidate();
     },
     onError: error => toast.error(error.message),
   });
@@ -1671,6 +1665,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
       toast.success(tx(`Рассрочка на @${result.nft.username} оформлена через сейф-контракт!`, `Installment for @${result.nft.username} created via safe vault contract!`));
       void utils.tgTop.myDeals.invalidate();
       void utils.tgTop.getNfts.invalidate();
+                    utils.tgTop.myDeals.invalidate();
     },
     onError: error => toast.error(error.message),
   });
@@ -1679,6 +1674,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
       toast.success(tx("Получение NFT подтверждено. Сделка успешно завершена.", "NFT receipt confirmed. Deal completed successfully."));
       void utils.tgTop.myDeals.invalidate();
       void utils.tgTop.getNfts.invalidate();
+                    utils.tgTop.myDeals.invalidate();
     },
     onError: error => toast.error(error.message),
   });
@@ -1687,6 +1683,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
       toast.success(tx("Сделка покупки отменена, средства возвращены покупателю.", "Purchase deal cancelled, funds refunded to buyer."));
       void utils.tgTop.myDeals.invalidate();
       void utils.tgTop.getNfts.invalidate();
+                    utils.tgTop.myDeals.invalidate();
     },
     onError: error => toast.error(error.message),
   });
@@ -2352,12 +2349,6 @@ export default function Home({ onReady }: { onReady?: () => void }) {
     setListingOpen(!options?.inline);
   };
   const openGiveawayCreate = (group: Group) => {
-    setGiveawayGroupId(String(group.id));
-    setGiveawayTitle(`Розыгрыш ${group.title}`);
-    setGiveawayPrizeTitle("");
-    setGiveawayRules("");
-    setGiveawayEndsAt("");
-    setGiveawayBoostOnly(false);
     setPage("giveaways");
     window.setTimeout(() => setGiveawayCreateOpen(true), 0);
   };
@@ -2834,8 +2825,19 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                   </section>
                 )}
                 <button type="button" onClick={() => isAuthenticated ? setBotListingSheetOpen(true) : toast.error(tx("Войдите в аккаунт, чтобы добавить бота", "Sign in to add a bot"))} aria-label={tx("Залистить бота", "List a bot")} title={tx("Залистить бота", "List a bot")} className="flex h-10 w-full items-center justify-center rounded-xl border border-dashed border-[#3f8cff]/28 bg-[#3f8cff]/[0.035] text-[#a6c8ff] transition-colors hover:bg-[#3f8cff]/10 active:scale-[0.985]"><Plus className="h-5 w-5" /></button>
-                <Sheet open={botCategorySheetOpen} onOpenChange={setBotCategorySheetOpen}><SheetContent side="bottom" className="rounded-t-[26px] border-white/10 bg-[#10161f] text-slate-100"><SheetHeader className="px-4 pb-2"><SheetTitle className="text-slate-100">{tx("Рубрика ботов", "Bot category")}</SheetTitle></SheetHeader><div className="max-h-[54dvh] space-y-1 overflow-y-auto px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-2"><button type="button" onClick={() => { setBotCategory("Все"); setBotCategorySheetOpen(false); }} className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm ${botCategory === "Все" ? "bg-[#3f8cff]/15 text-[#d7e7f6]" : "text-slate-300 hover:bg-white/5"}`}><span>{tx("Все рубрики", "All categories")}</span>{botCategory === "Все" && <Check className="h-4 w-4 text-[#8fb9ff]" />}</button>{botTopicOptions.map(topic => <button key={topic.id} type="button" onClick={() => { setBotCategory(topic.code); setBotCategorySheetOpen(false); }} className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm ${botCategory === topic.code ? "bg-[#3f8cff]/15 text-[#d7e7f6]" : "text-slate-300 hover:bg-white/5"}`}><span>{topic.label}</span>{botCategory === topic.code && <Check className="h-4 w-4 text-[#8fb9ff]" />}</button>)}</div></SheetContent></Sheet>
-                <Sheet open={botListingSheetOpen} onOpenChange={setBotListingSheetOpen}><SheetContent side="bottom" className="rounded-t-[26px] border-white/10 bg-[#10161f] text-slate-100"><SheetHeader className="px-4 pb-2"><SheetTitle className="text-slate-100">{tx("Залистить бота", "List a bot")}</SheetTitle><p className="text-xs leading-5 text-slate-500">{tx("Вставьте публичную ссылку. Бот появится в каталоге только после ручной проверки модератором.", "Paste a public link. The bot appears only after manual moderation.")}</p></SheetHeader><div className="space-y-3 px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3"><Input autoFocus value={botTelegramLinkDraft} onChange={event => setBotTelegramLinkDraft(event.target.value)} placeholder="https://t.me/username" className="h-11 border-white/10 bg-[#17212b] px-3 text-sm text-slate-100 placeholder:text-slate-600" /><button type="button" onClick={() => submitBotListing.mutate({ telegramLink: botTelegramLinkDraft })} disabled={botTelegramLinkDraft.trim().length < 3 || submitBotListing.isPending} className="h-11 w-full rounded-xl bg-[#3f8cff] text-sm font-semibold text-white disabled:opacity-45">{submitBotListing.isPending ? tx("Отправляем…", "Sending…") : tx("Отправить на проверку", "Submit for review")}</button></div></SheetContent></Sheet>
+                <BotCategorySheet
+                  open={botCategorySheetOpen}
+                  onOpenChange={setBotCategorySheetOpen}
+                  language={language}
+                  botCategory={botCategory}
+                  setBotCategory={setBotCategory}
+                  botTopicOptions={botTopicOptions as { id: number; code: string; label: string }[]}
+                />
+                <BotListingSheet
+                  open={botListingSheetOpen}
+                  onOpenChange={setBotListingSheetOpen}
+                  language={language}
+                />
               </section>
             ) : topSection === "nft" ? (
               <section className="space-y-2 pt-1">
@@ -2849,7 +2851,12 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       <>
                         <button
                           type="button"
-                          onClick={() => setNftListingSheetOpen(true)}
+                          onClick={() => {
+                            setNftListingAssetClass("offchain");
+                            setNftListingItemAddress("");
+                            setNftListingUsername("");
+                            setNftListingSheetOpen(true);
+                          }}
                           className="flex items-center gap-1 rounded-lg border border-emerald-500/35 bg-emerald-500/12 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/20 active:scale-[0.98]"
                         >
                           <Plus className="h-3 w-3" />
@@ -2908,221 +2915,31 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                 )}
 
                 {/* NFT Listing Sheet */}
-                <Sheet open={nftListingSheetOpen} onOpenChange={setNftListingSheetOpen}>
-                  <SheetContent side="bottom" className="rounded-t-[26px] border-white/10 bg-[#10161f] text-slate-100 max-h-[85dvh] overflow-y-auto">
-                    <SheetHeader className="px-4 pb-2">
-                      <SheetTitle className="text-slate-100">{tx("Залистить NFT на маркет", "List NFT on Marketplace")}</SheetTitle>
-                      <p className="text-xs text-slate-400">
-                        {tx("Выберите форматы сделки: прямая продажа, аренда с сейф-кошельком или рассрочка.", "Choose deal formats: instant sale, rental with vault wallet, or installments.")}
-                      </p>
-                    </SheetHeader>
-                    <div className="space-y-4 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-2">
-                      <div>
-                        <label className="text-xs font-medium text-slate-300">{tx("Юзернейм (без @)", "Username (without @)")}</label>
-                        <Input
-                          value={nftListingUsername}
-                          onChange={e => setNftListingUsername(e.target.value.replace(/^@/, "").trim())}
-                          placeholder="durov"
-                          className="mt-1.5 h-11 border-white/10 bg-[#17212b] px-3 text-sm text-slate-100 placeholder:text-slate-600"
-                        />
-                      </div>
+                <NftListingSheet
+                  open={nftListingSheetOpen}
+                  onOpenChange={setNftListingSheetOpen}
+                  language={language}
+                  initialUsername={nftListingUsername}
+                  initialAssetClass={nftListingAssetClass}
+                  initialItemAddress={nftListingItemAddress}
+                  ownerWalletAddress={safeWalletAddress || undefined}
+                  onSuccess={() => {
+                    utils.tgTop.getNfts.invalidate();
+                    utils.tgTop.myDeals.invalidate();
+                  }}
+                />
+                
 
-                      <div>
-                        <label className="text-xs font-medium text-slate-300">{tx("Форматы сделки", "Deal formats")}</label>
-                        <div className="mt-2 grid grid-cols-3 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setNftListingSaleEnabled(!nftListingSaleEnabled)}
-                            className={`rounded-xl border p-2.5 text-center text-xs font-medium transition-colors ${nftListingSaleEnabled ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-white/10 bg-white/5 text-slate-400"}`}
-                          >
-                            {tx("Продажа", "Sale")}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setNftListingRentEnabled(!nftListingRentEnabled)}
-                            className={`rounded-xl border p-2.5 text-center text-xs font-medium transition-colors ${nftListingRentEnabled ? "border-[#3f8cff]/50 bg-[#3f8cff]/15 text-[#a6c8ff]" : "border-white/10 bg-white/5 text-slate-400"}`}
-                          >
-                            {tx("Аренда", "Rent")}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setNftListingInstallmentsEnabled(!nftListingInstallmentsEnabled)}
-                            className={`rounded-xl border p-2.5 text-center text-xs font-medium transition-colors ${nftListingInstallmentsEnabled ? "border-amber-500/50 bg-amber-500/15 text-amber-300" : "border-white/10 bg-white/5 text-slate-400"}`}
-                          >
-                            {tx("Рассрочка", "Installments")}
-                          </button>
-                        </div>
-                      </div>
-
-                      {nftListingSaleEnabled && (
-                        <div className="rounded-xl border border-white/8 bg-white/5 p-3 space-y-2">
-                          <span className="text-xs font-semibold text-emerald-400">{tx("Параметры продажи", "Sale parameters")}</span>
-                          <div>
-                            <label className="text-[11px] text-slate-400">{tx("Цена покупки (TON / GRAM)", "Purchase price (TON / GRAM)")}</label>
-                            <Input
-                              type="number"
-                              value={nftListingPriceTon}
-                              onChange={e => setNftListingPriceTon(e.target.value)}
-                              placeholder="50"
-                              className="mt-1 h-9 border-white/10 bg-[#17212b] px-3 text-sm text-slate-100"
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {nftListingRentEnabled && (
-                        <div className="rounded-xl border border-[#3f8cff]/20 bg-[#3f8cff]/8 p-3 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-[#a6c8ff]">{tx("Параметры аренды (Сейф)", "Rental parameters (Vault)")}</span>
-                            <span className="flex items-center gap-1 rounded bg-[#3f8cff]/15 px-1.5 py-0.5 text-[9px] font-medium text-[#c8ddff]">
-                              <Lock className="h-2.5 w-2.5" />
-                              {tx("Без права передачи", "Non-transferable")}
-                            </span>
-                          </div>
-                          <div>
-                            <label className="text-[11px] text-slate-400">{tx("Стоимость аренды в день (TON / GRAM)", "Daily rent (TON / GRAM)")}</label>
-                            <Input
-                              type="number"
-                              step="0.1"
-                              value={nftListingRentPriceDay}
-                              onChange={e => setNftListingRentPriceDay(e.target.value)}
-                              placeholder="0.5"
-                              className="mt-1 h-9 border-white/10 bg-[#17212b] px-3 text-sm text-slate-100"
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[11px] text-slate-400">{tx("Мин. срок (дней)", "Min days")}</label>
-                              <Input
-                                type="number"
-                                value={nftListingRentMinDays}
-                                onChange={e => setNftListingRentMinDays(Number(e.target.value))}
-                                className="mt-1 h-9 border-white/10 bg-[#17212b] px-3 text-sm text-slate-100"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[11px] text-slate-400">{tx("Макс. срок (дней)", "Max days")}</label>
-                              <Input
-                                type="number"
-                                value={nftListingRentMaxDays}
-                                onChange={e => setNftListingRentMaxDays(Number(e.target.value))}
-                                className="mt-1 h-9 border-white/10 bg-[#17212b] px-3 text-sm text-slate-100"
-                              />
-                            </div>
-                          </div>
-                          <p className="text-[10px] leading-4 text-slate-400">
-                            {tx("🛡️ Механика сейфа (как на Marketapp): при аренде NFT переводится на защищённый смарт-контракт сейфа. Арендатор сможет поставить юзернейм на свой аккаунт/канал, но не сможет украсть или перепродать его.", "🛡️ Vault mechanic: when rented, the NFT is locked in a dedicated vault contract. The renter can bind the username to their account/channel, but cannot steal or transfer it.")}
-                          </p>
-                        </div>
-                      )}
-
-                      {nftListingInstallmentsEnabled && (
-                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 p-3 space-y-3">
-                          <span className="text-xs font-semibold text-amber-400">{tx("Параметры рассрочки", "Installment parameters")}</span>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[11px] text-slate-400">{tx("Первый взнос (TON)", "Down payment (TON)")}</label>
-                              <Input
-                                type="number"
-                                value={nftListingInstallmentDownPayment}
-                                onChange={e => setNftListingInstallmentDownPayment(e.target.value)}
-                                placeholder="15"
-                                className="mt-1 h-9 border-white/10 bg-[#17212b] px-3 text-sm text-slate-100"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[11px] text-slate-400">{tx("Срок выплаты (дней)", "Period (days)")}</label>
-                              <Input
-                                type="number"
-                                value={nftListingInstallmentDays}
-                                onChange={e => setNftListingInstallmentDays(Number(e.target.value))}
-                                className="mt-1 h-9 border-white/10 bg-[#17212b] px-3 text-sm text-slate-100"
-                              />
-                            </div>
-                          </div>
-                          <p className="text-[10px] leading-4 text-slate-400">
-                            {tx("🔒 NFT удерживается в сейфе на период рассрочки до полной выплаты стоимости.", "🔒 The NFT is safely held in the vault until full payment.")}
-                          </p>
-                        </div>
-                      )}
-
-                      <button
-                        type="button"
-                        disabled={
-                          !nftListingUsername.trim() ||
-                          (!nftListingSaleEnabled && !nftListingRentEnabled && !nftListingInstallmentsEnabled) ||
-                          createNftMutation.isPending
-                        }
-                        onClick={() => {
-                          const modes: string[] = [];
-                          if (nftListingSaleEnabled) modes.push("sale");
-                          if (nftListingRentEnabled) modes.push("rent");
-                          if (nftListingInstallmentsEnabled) modes.push("installments");
-
-                          createNftMutation.mutate({
-                            username: nftListingUsername.trim(),
-                            price: `${nftListingPriceTon} TON`,
-                            priceAmount: Number(nftListingPriceTon) || 0,
-                            rentalPricePerDay: `${nftListingRentPriceDay} TON`,
-                            rentalAmountPerDay: Number(nftListingRentPriceDay) || 0,
-                            minRentalDays: nftListingRentMinDays,
-                            maxRentalDays: nftListingRentMaxDays,
-                            listingType: modes.includes("sale") && modes.includes("rent") ? "both" : modes.includes("rent") ? "rent" : "sale",
-                            assetClass: "offchain",
-                            installmentsEnabled: nftListingInstallmentsEnabled,
-                            installmentsDownPayment: Number(nftListingInstallmentDownPayment) || 0,
-                            installmentsPeriodDays: nftListingInstallmentDays,
-                            installmentsTotalPrice: Number(nftListingPriceTon) || 0,
-                            modes,
-                          });
-                        }}
-                        className="h-11 w-full rounded-xl bg-[#3f8cff] text-sm font-semibold text-white transition-colors hover:bg-[#3377dd] disabled:opacity-45 active:scale-[0.98]"
-                      >
-                        {createNftMutation.isPending ? tx("Публикуем…", "Publishing…") : tx("Опубликовать NFT на маркете", "Publish NFT on Marketplace")}
-                      </button>
-                    </div>
-                  </SheetContent>
-                </Sheet>
-
-                {/* Buy NFT Sheet */}
-                <Sheet open={nftBuySheetOpen} onOpenChange={setNftBuySheetOpen}>
-                  <SheetContent side="bottom" className="rounded-t-[26px] border-white/10 bg-[#10161f] text-slate-100">
-                    <SheetHeader className="px-4 pb-2">
-                      <SheetTitle className="text-slate-100">{tx("Покупка NFT-юзернейма", "Buy NFT Username")}</SheetTitle>
-                    </SheetHeader>
-                    {selectedNftForBuy && (
-                      <div className="space-y-4 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-2">
-                        <div className="rounded-2xl border border-white/8 bg-white/5 p-4 text-center">
-                          <b className="block text-xl font-bold text-slate-100">@{selectedNftForBuy.username}</b>
-                          <span className="mt-1 block text-sm text-slate-400">{tx("Владелец", "Owner")}: {selectedNftForBuy.ownerUsername}</span>
-                          <div className="mt-3 inline-block rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2">
-                            <span className="block text-xs text-slate-400">{tx("Стоимость покупки", "Purchase price")}</span>
-                            <b className="text-lg font-bold text-emerald-300">{selectedNftForBuy.price}</b>
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl border border-white/8 bg-[#17212b] p-3">
-                          <div className="flex items-center gap-2 text-xs font-semibold text-[#a6c8ff]">
-                            <ShieldCheck className="h-4 w-4 shrink-0" />
-                            <span>{tx("Защита эскроу-сделкой", "Escrow protected deal")}</span>
-                          </div>
-                          <p className="mt-1.5 text-[11px] leading-4 text-slate-400">
-                            {tx("Сумма покупки депонируется на эскроу. Продавец передает NFT, а после подтверждения получения средства переводятся продавцу. Вы полностью защищены от мошенничества.", "The purchase amount is safely held in escrow. The seller transfers the NFT, and after confirmation, funds are released to the seller.")}
-                          </p>
-                        </div>
-
-                        <button
-                          type="button"
-                          disabled={createNftBuyDealMutation.isPending}
-                          onClick={() => createNftBuyDealMutation.mutate({ nftId: selectedNftForBuy.id })}
-                          className="h-11 w-full rounded-xl bg-emerald-600 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:opacity-45 active:scale-[0.98]"
-                        >
-                          {createNftBuyDealMutation.isPending ? tx("Открываем сделку…", "Opening deal…") : tx("Подтвердить покупку через Эскроу", "Confirm Purchase via Escrow")}
-                        </button>
-                      </div>
-                    )}
-                  </SheetContent>
-                </Sheet>
+                <NftBuySheet
+                  open={nftBuySheetOpen}
+                  onOpenChange={setNftBuySheetOpen}
+                  language={language}
+                  selectedNft={selectedNftForBuy}
+                  onSuccess={() => {
+                    utils.tgTop.getNfts.invalidate();
+                    utils.tgTop.myDeals.invalidate();
+                  }}
+                />
 
                 {/* Rental Sheet */}
                 <Sheet open={nftRentalSheetOpen} onOpenChange={setNftRentalSheetOpen}>
@@ -3436,9 +3253,13 @@ export default function Home({ onReady }: { onReady?: () => void }) {
               ))}
               {!giveaways.length && <div className="rounded-2xl border border-dashed border-white/10 bg-[#111720] p-7 text-center"><Star className="mx-auto h-6 w-6 text-slate-600" /><b className="mt-3 block text-sm text-slate-300">Активных розыгрышей пока нет</b><p className="mt-1 text-xs leading-5 text-slate-500">Первый розыгрыш может создать владелец подключённой группы.</p></div>}
             </div>
-            <Sheet open={giveawayCreateOpen} onOpenChange={setGiveawayCreateOpen}>
-            <SheetContent side="bottom" className="max-h-[92dvh] overflow-y-auto rounded-t-[22px] border-white/10 bg-[#10161f] text-slate-100"><SheetHeader className="px-4"><SheetTitle className="text-slate-100">Создать розыгрыш</SheetTitle></SheetHeader><div className="space-y-3 px-4 pb-5"><Select value={giveawayGroupId} onValueChange={setGiveawayGroupId}><SelectTrigger className="h-11 border-white/10 bg-[#0b0f14] text-slate-200"><SelectValue placeholder="Выберите свою группу" /></SelectTrigger><SelectContent className="border-white/10 bg-[#111720] text-slate-100">{mine.map(group => <SelectItem key={group.id} value={String(group.id)}>{group.title}</SelectItem>)}</SelectContent></Select><Input value={giveawayTitle} maxLength={160} onChange={event => setGiveawayTitle(event.target.value)} placeholder="Название розыгрыша" className="h-11 border-white/10 bg-[#0b0f14]" /><Input value={giveawayPrizeTitle} maxLength={160} onChange={event => setGiveawayPrizeTitle(event.target.value)} placeholder="Приз" className="h-11 border-white/10 bg-[#0b0f14]" /><Textarea value={giveawayRules} maxLength={2000} onChange={event => setGiveawayRules(event.target.value)} placeholder="Правила участия (необязательно)" className="min-h-20 border-white/10 bg-[#0b0f14]" /><label className="flex items-start gap-3 rounded-xl border border-white/10 bg-[#0b0f14] px-3 py-3"><input type="checkbox" checked={giveawayBoostOnly} onChange={event => setGiveawayBoostOnly(event.target.checked)} className="mt-0.5 h-4 w-4 accent-[#3f8cff]" /><span><b className="block text-xs text-slate-200">Только для бустеров</b><small className="mt-1 block text-[11px] leading-4 text-slate-500">Перед вступлением бот проверит, что пользователь бустит выбранное сообщество.</small></span></label><Input value={giveawayEndsAt} type="datetime-local" min={new Date(Date.now() + 5 * 60_000).toISOString().slice(0, 16)} onChange={event => setGiveawayEndsAt(event.target.value)} className="h-11 border-white/10 bg-[#0b0f14]" /><button type="button" onClick={() => { const groupId = Number(giveawayGroupId); const endsAt = new Date(giveawayEndsAt); if (!groupId || giveawayTitle.trim().length < 3 || giveawayPrizeTitle.trim().length < 2 || Number.isNaN(endsAt.getTime())) { toast.error("Заполните группу, название, приз и время окончания"); return; } createGiveaway.mutate({ groupId, title: giveawayTitle, prizeTitle: giveawayPrizeTitle, rules: giveawayRules || undefined, boostOnly: giveawayBoostOnly, endsAt }); }} disabled={createGiveaway.isPending} className="w-full rounded-xl bg-[#1688f5] px-4 py-3 text-sm font-semibold text-white disabled:opacity-45">{createGiveaway.isPending ? "Публикуем…" : "Опубликовать розыгрыш"}</button></div></SheetContent>
-            </Sheet>
+            <GiveawayCreateSheet
+              open={giveawayCreateOpen}
+              onOpenChange={setGiveawayCreateOpen}
+              language={language}
+              mine={mine as any}
+              onSuccess={() => utils.tgTop.openGiveaways.invalidate()}
+            />
           </section>
         )}
 
@@ -3691,13 +3512,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
             </>}
             {workspaceSection === "bots" && (
               <section className="space-y-3">
-                <article className="rounded-2xl border border-[#3f8cff]/20 bg-[#3f8cff]/[0.055] p-3.5">
-                  <div className="flex items-start gap-3">
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[#72a8ff]/25 bg-[#3f8cff]/10 text-[#a6c8ff]"><Bot className="h-5 w-5" /></span>
-                    <span className="min-w-0 flex-1"><b className="block text-sm text-slate-100">{tx("Залистить бота", "List a bot")}</b><small className="mt-1 block text-[11px] leading-4 text-slate-400">{tx("Вставьте публичную ссылку на бота. До ручной проверки модератором он не появится в каталоге.", "Paste a public bot link. It will not appear in the catalog until a moderator reviews it.")}</small></span>
-                  </div>
-                  <div className="mt-3 flex gap-2"><Input value={botTelegramLinkDraft} onChange={event => setBotTelegramLinkDraft(event.target.value)} placeholder="https://t.me/username" className="h-10 min-w-0 flex-1 border-white/10 bg-[#111720] px-3 text-xs text-slate-100 placeholder:text-slate-600" /><button type="button" onClick={() => submitBotListing.mutate({ telegramLink: botTelegramLinkDraft })} disabled={botTelegramLinkDraft.trim().length < 3 || submitBotListing.isPending} className="h-10 shrink-0 rounded-lg border border-[#72a8ff]/30 bg-[#3f8cff]/10 px-3 text-[10px] font-semibold text-[#c8ddff] disabled:opacity-45">{submitBotListing.isPending ? tx("Отправляем…", "Sending…") : tx("На проверку", "Submit")}</button></div>
-                </article>
+                
                 {myBotListings.length ? <section className="space-y-2">{myBotListings.map(bot => {
                   const status = bot.moderationStatus === "approved" ? tx("Одобрен", "Approved") : bot.moderationStatus === "rejected" ? tx("Отклонён", "Rejected") : tx("На проверке", "Pending review");
                   const statusStyle = bot.moderationStatus === "approved" ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100" : bot.moderationStatus === "rejected" ? "border-rose-300/25 bg-rose-400/10 text-rose-100" : "border-amber-300/25 bg-amber-300/10 text-amber-100";
@@ -3731,7 +3546,12 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     ] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setWalletNftFilter(value)} className={`h-7 shrink-0 rounded-full border px-2.5 text-[9px] font-medium ${walletNftFilter === value ? "border-[#3f8cff]/45 bg-[#3f8cff]/12 text-[#c8ddff]" : "border-white/10 bg-white/[0.025] text-slate-500"}`}>{label}</button>)}
                   </div>
                   <div className="flex items-center justify-between px-0.5 text-[10px] text-slate-500"><span>{visibleWalletNfts.length} {tx("NFT", "NFTs")}</span><span className="font-mono">{safeWalletAddress.slice(0, 5)}…{safeWalletAddress.slice(-4)}</span></div>
-                  {visibleWalletNfts.length ? <div className="grid grid-cols-2 gap-2">{visibleWalletNfts.map(item => <WalletNftCard key={item.address} item={item} language={language} />)}</div> : <div className="rounded-xl border border-dashed border-white/12 p-6 text-center"><Hash className="mx-auto h-5 w-5 text-slate-600" /><b className="mt-2 block text-xs text-slate-300">{walletNfts.length ? tx("В этой категории пока нет NFT", "No NFTs in this category") : tx("NFT в кошельке не найдено", "No NFTs found in this wallet")}</b><small className="mt-1 block text-[10px] leading-4 text-slate-500">{walletNfts.length ? tx("Выберите другую категорию.", "Choose a different category.") : tx("Сеть GRAM не вернула NFT для подключённого адреса.", "The GRAM network returned no NFTs for the connected address.")}</small></div>}
+                  {visibleWalletNfts.length ? <div className="grid grid-cols-2 gap-2">{visibleWalletNfts.map(item => <WalletNftCard key={item.address} item={item} language={language} onList={nft => {
+                    setNftListingUsername(nft.name.replace(/^@/, "").trim());
+                    setNftListingAssetClass("onchain");
+                    setNftListingItemAddress(nft.address);
+                    setNftListingSheetOpen(true);
+                  }} />)}</div> : <div className="rounded-xl border border-dashed border-white/12 p-6 text-center"><Hash className="mx-auto h-5 w-5 text-slate-600" /><b className="mt-2 block text-xs text-slate-300">{walletNfts.length ? tx("В этой категории пока нет NFT", "No NFTs in this category") : tx("NFT в кошельке не найдено", "No NFTs found in this wallet")}</b><small className="mt-1 block text-[10px] leading-4 text-slate-500">{walletNfts.length ? tx("Выберите другую категорию.", "Choose a different category.") : tx("Сеть GRAM не вернула NFT для подключённого адреса.", "The GRAM network returned no NFTs for the connected address.")}</small></div>}
                 </>}
               </section>
             )}
