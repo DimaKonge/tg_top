@@ -212,6 +212,40 @@ async function startServer() {
     serveStatic(app);
   }
 
+  // --- AUTOMATIC CLEANUP ON BOOT ---
+  try {
+    const db = await getDb();
+    if (db) {
+      console.log("Running automatic slot deduplication...");
+      const { auctionSlots, groupsCatalog } = await import("../../drizzle/schema");
+      const { isNotNull, eq, like } = await import("drizzle-orm");
+      
+      const slots = await db.select().from(auctionSlots).where(isNotNull(auctionSlots.groupId));
+      const seen = new Set();
+      const duplicateSlots = [];
+      for (const slot of slots) {
+        // If a single user is occupying multiple slots OR it's a buggy placeholder
+        if (seen.has(slot.leaderUserId) || slot.title === "Свободное место") {
+           duplicateSlots.push(slot.id);
+        } else {
+           seen.add(slot.leaderUserId);
+        }
+      }
+      for (const id of duplicateSlots) {
+         await db.update(auctionSlots).set({ groupId: null, leaderUserId: null, leaderUsername: "-", currentBid: "0 GRAM", bidAmount: 0 }).where(eq(auctionSlots.id, id));
+      }
+      
+      const badGroups = await db.select().from(groupsCatalog).where(like(groupsCatalog.title, "%-%"));
+      for (const g of badGroups) {
+          await db.delete(groupsCatalog).where(eq(groupsCatalog.id, g.id));
+      }
+      console.log(`Cleanup finished: Removed ${duplicateSlots.length} duplicated slots and ${badGroups.length} bad groups.`);
+    }
+  } catch (err) {
+    console.error("Cleanup failed:", err);
+  }
+  // ---------------------------------
+
   const port = Number(process.env.PORT) || 3000;
   server.listen(port, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${port}/`);
