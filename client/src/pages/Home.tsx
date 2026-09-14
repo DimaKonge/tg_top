@@ -40,8 +40,9 @@ import {
   Hash,
   LayoutGrid,
   Languages,
-   List,
-   MessageSquare,
+  List,
+  Lock,
+  MessageSquare,
    Minus,
   PackageOpen,
   Palette,
@@ -1025,6 +1026,26 @@ export default function Home({ onReady }: { onReady?: () => void }) {
   const [botModerationFilter, setBotModerationFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [botCategorySheetOpen, setBotCategorySheetOpen] = useState(false);
   const [botListingSheetOpen, setBotListingSheetOpen] = useState(false);
+  const [nftListingSheetOpen, setNftListingSheetOpen] = useState(false);
+  const [nftListingUsername, setNftListingUsername] = useState("");
+  const [nftListingSaleEnabled, setNftListingSaleEnabled] = useState(true);
+  const [nftListingRentEnabled, setNftListingRentEnabled] = useState(false);
+  const [nftListingInstallmentsEnabled, setNftListingInstallmentsEnabled] = useState(false);
+  const [nftListingPriceTon, setNftListingPriceTon] = useState("50");
+  const [nftListingRentPriceDay, setNftListingRentPriceDay] = useState("0.5");
+  const [nftListingRentMinDays, setNftListingRentMinDays] = useState(7);
+  const [nftListingRentMaxDays, setNftListingRentMaxDays] = useState(180);
+  const [nftListingInstallmentDownPayment, setNftListingInstallmentDownPayment] = useState("15");
+  const [nftListingInstallmentDays, setNftListingInstallmentDays] = useState(30);
+  const [nftBuySheetOpen, setNftBuySheetOpen] = useState(false);
+  const [selectedNftForBuy, setSelectedNftForBuy] = useState<Nft | null>(null);
+  const [nftRentalSheetOpen, setNftRentalSheetOpen] = useState(false);
+  const [selectedNftForRent, setSelectedNftForRent] = useState<Nft | null>(null);
+  const [rentalDaysInput, setRentalDaysInput] = useState(7);
+  const [nftInstallmentSheetOpen, setNftInstallmentSheetOpen] = useState(false);
+  const [selectedNftForInstallment, setSelectedNftForInstallment] = useState<Nft | null>(null);
+  const [installmentDaysInput, setInstallmentDaysInput] = useState(30);
+  const [installmentDownPaymentInput, setInstallmentDownPaymentInput] = useState("15");
   const dealsQuery = trpc.tgTop.myDeals.useQuery(undefined, {
     enabled: isAuthenticated,
   });
@@ -1616,8 +1637,56 @@ export default function Home({ onReady }: { onReady?: () => void }) {
   const createNftRentalDeal = trpc.tgTop.createNftRentalDeal.useMutation({
     onSuccess: result => {
       setNftRentalDraft(null);
-      toast.success(tx(`Заявка на аренду @${result.nft.username} создана. Назначение через Telegram/Fragment ещё нужно подтвердить.`, `Rental request for @${result.nft.username} created. Telegram/Fragment assignment still requires confirmation.`));
+      setNftRentalSheetOpen(false);
+      setSelectedNftForRent(null);
+      toast.success(tx(`Заявка на аренду @${result.nft.username} создана. Сейф-контракт готов к привязке.`, `Rental request for @${result.nft.username} created. Vault contract ready for link.`));
       void utils.tgTop.myDeals.invalidate();
+      void utils.tgTop.getNfts.invalidate();
+    },
+    onError: error => toast.error(error.message),
+  });
+  const createNftMutation = trpc.tgTop.createNft.useMutation({
+    onSuccess: () => {
+      toast.success(tx("NFT успешно выставлен на маркетплейс!", "NFT successfully listed on the marketplace!"));
+      setNftListingSheetOpen(false);
+      setNftListingUsername("");
+      void utils.tgTop.getNfts.invalidate();
+    },
+    onError: error => toast.error(error.message),
+  });
+  const createNftBuyDealMutation = trpc.tgTop.createNftBuyDeal.useMutation({
+    onSuccess: result => {
+      setNftBuySheetOpen(false);
+      setSelectedNftForBuy(null);
+      toast.success(tx(`Безопасная сделка на покупку @${result.nft.username} открыта. Эскроу защищает обе стороны.`, `Secure purchase deal for @${result.nft.username} created. Escrow protects both parties.`));
+      void utils.tgTop.myDeals.invalidate();
+      void utils.tgTop.getNfts.invalidate();
+    },
+    onError: error => toast.error(error.message),
+  });
+  const createNftInstallmentDealMutation = trpc.tgTop.createNftInstallmentDeal.useMutation({
+    onSuccess: result => {
+      setNftInstallmentSheetOpen(false);
+      setSelectedNftForInstallment(null);
+      toast.success(tx(`Рассрочка на @${result.nft.username} оформлена через сейф-контракт!`, `Installment for @${result.nft.username} created via safe vault contract!`));
+      void utils.tgTop.myDeals.invalidate();
+      void utils.tgTop.getNfts.invalidate();
+    },
+    onError: error => toast.error(error.message),
+  });
+  const confirmNftBuyMutation = trpc.tgTop.confirmNftBuy.useMutation({
+    onSuccess: () => {
+      toast.success(tx("Получение NFT подтверждено. Сделка успешно завершена.", "NFT receipt confirmed. Deal completed successfully."));
+      void utils.tgTop.myDeals.invalidate();
+      void utils.tgTop.getNfts.invalidate();
+    },
+    onError: error => toast.error(error.message),
+  });
+  const cancelNftBuyMutation = trpc.tgTop.cancelNftBuy.useMutation({
+    onSuccess: () => {
+      toast.success(tx("Сделка покупки отменена, средства возвращены покупателю.", "Purchase deal cancelled, funds refunded to buyer."));
+      void utils.tgTop.myDeals.invalidate();
+      void utils.tgTop.getNfts.invalidate();
     },
     onError: error => toast.error(error.message),
   });
@@ -1640,10 +1709,12 @@ export default function Home({ onReady }: { onReady?: () => void }) {
       const byDealCategory = nftDealCategory === "all"
         ? byAssetClass
         : nftDealCategory === "sale"
-          ? byAssetClass.filter(nft => nft.listingType === "sale" || nft.listingType === "both")
+          ? byAssetClass.filter(nft => nft.listingType === "sale" || nft.listingType === "both" || nft.modes?.includes("sale"))
           : nftDealCategory === "rent"
-            ? byAssetClass.filter(nft => nft.listingType === "rent" || nft.listingType === "both")
-            : [];
+            ? byAssetClass.filter(nft => nft.listingType === "rent" || nft.listingType === "both" || nft.modes?.includes("rent"))
+            : nftDealCategory === "installments"
+              ? byAssetClass.filter(nft => Boolean(nft.installmentsAvailable) || nft.modes?.includes("installments"))
+              : byAssetClass;
       const query = topSearchQuery.trim().toLowerCase();
       return query
         ? byDealCategory.filter(nft => `${nft.username} ${nft.ownerUsername}`.toLowerCase().includes(query))
@@ -2768,16 +2839,28 @@ export default function Home({ onReady }: { onReady?: () => void }) {
               </section>
             ) : topSection === "nft" ? (
               <section className="space-y-2 pt-1">
-                <div className="flex items-baseline justify-between px-1">
+                <div className="flex items-center justify-between px-1">
                   <span>
                     <h2 className="text-sm font-semibold text-slate-200">{tx("NFT-направление", "NFT marketplace")}</h2>
                     <span className="text-[10px] text-slate-500">{tx("цифровые активы Telegram", "Telegram digital assets")}</span>
                   </span>
-                  {isAuthenticated && (
-                    <button onClick={openNftTransfer} className="rounded-lg border border-[#3f8cff]/35 bg-[#3f8cff]/10 px-2.5 py-1.5 text-[10px] font-semibold text-[#a6c8ff]">
-                      {tx("Заявка на передачу", "Transfer request")}
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {isAuthenticated && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setNftListingSheetOpen(true)}
+                          className="flex items-center gap-1 rounded-lg border border-emerald-500/35 bg-emerald-500/12 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/20 active:scale-[0.98]"
+                        >
+                          <Plus className="h-3 w-3" />
+                          {tx("Залистить NFT", "List NFT")}
+                        </button>
+                        <button onClick={openNftTransfer} className="rounded-lg border border-[#3f8cff]/35 bg-[#3f8cff]/10 px-2.5 py-1.5 text-[10px] font-semibold text-[#a6c8ff]">
+                          {tx("Заявка на передачу", "Transfer request")}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
                 <div aria-label="Рубрики NFT" className="flex gap-1.5 overflow-x-auto rounded-lg border border-white/8 bg-[#111720] p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {([
@@ -2793,25 +2876,363 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                 {nftsQuery.isLoading ? (
                   <div className="rounded-2xl border border-white/8 bg-[#111720] p-6 text-center text-sm text-slate-500">{ui.loading}</div>
                 ) : visibleNfts.length ? (
-                  <div className="space-y-2">{visibleNfts.map(nft => <NftCard key={nft.id} nft={nft} language={language} onRent={nft => {
-                    const entered = window.prompt(language === "en" ? `Rental days (${nft.minRentalDays}-${nft.maxRentalDays})` : `Срок аренды в днях (${nft.minRentalDays}–${nft.maxRentalDays})`, String(nft.minRentalDays));
-                    if (entered === null) return;
-                    const rentalDays = Number(entered.trim());
-                    if (!Number.isInteger(rentalDays) || rentalDays < nft.minRentalDays || rentalDays > nft.maxRentalDays) {
-                      toast.error(language === "en" ? "Enter a valid rental period." : "Укажите корректный срок аренды.");
-                      return;
-                    }
-                    const confirmed = window.confirm(language === "en"
-                      ? `Create a rental request for @${nft.username} for ${rentalDays} days? No payment or Telegram assignment will happen automatically.`
-                      : `Создать заявку на аренду @${nft.username} на ${rentalDays} дней? Оплата и назначение в Telegram автоматически не выполняются.`);
-                    if (confirmed) createNftRentalDeal.mutate({ nftId: nft.id, rentalDays });
-                  }} />)}</div>
+                  <div className="space-y-2">
+                    {visibleNfts.map(nft => (
+                      <NftCard
+                        key={nft.id}
+                        nft={nft}
+                        language={language}
+                        onBuy={targetNft => {
+                          setSelectedNftForBuy(targetNft);
+                          setNftBuySheetOpen(true);
+                        }}
+                        onRent={targetNft => {
+                          setSelectedNftForRent(targetNft);
+                          setRentalDaysInput(targetNft.minRentalDays || 7);
+                          setNftRentalSheetOpen(true);
+                        }}
+                        onInstallments={targetNft => {
+                          setSelectedNftForInstallment(targetNft);
+                          setInstallmentDaysInput(targetNft.installmentsPeriodDays ?? 30);
+                          setInstallmentDownPaymentInput(targetNft.installmentsDownPayment ?? String((Number(targetNft.price) * 0.3).toFixed(2)));
+                          setNftInstallmentSheetOpen(true);
+                        }}
+                      />
+                    ))}
+                  </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-white/12 bg-[#111720] p-7 text-center">
                     <p className="text-sm font-medium text-slate-300">{tx("В этой категории NFT пока нет", "No NFTs in this category yet")}</p>
                     <p className="mt-1 text-xs leading-5 text-slate-500">{nftDealCategory === "auction" || nftDealCategory === "installments" || nftDealCategory === "collateral" ? tx("Первые предложения появятся после безопасного листинга владельцами. Никакие платежи или передачи здесь ещё не создаются.", "Offers will appear after owners create secure listings. No payment or transfer is created here.") : nftMarketCategory === "usernames" ? tx("Юзернеймы появятся здесь после размещения владельцем.", "Usernames will appear here after owner listing.") : tx("Раздел появится после добавления первых активов.", "This category will appear after the first assets are added.")}</p>
                   </div>
                 )}
+
+                {/* NFT Listing Sheet */}
+                <Sheet open={nftListingSheetOpen} onOpenChange={setNftListingSheetOpen}>
+                  <SheetContent side="bottom" className="rounded-t-[26px] border-white/10 bg-[#10161f] text-slate-100 max-h-[85dvh] overflow-y-auto">
+                    <SheetHeader className="px-4 pb-2">
+                      <SheetTitle className="text-slate-100">{tx("Залистить NFT на маркет", "List NFT on Marketplace")}</SheetTitle>
+                      <p className="text-xs text-slate-400">
+                        {tx("Выберите форматы сделки: прямая продажа, аренда с сейф-кошельком или рассрочка.", "Choose deal formats: instant sale, rental with vault wallet, or installments.")}
+                      </p>
+                    </SheetHeader>
+                    <div className="space-y-4 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-2">
+                      <div>
+                        <label className="text-xs font-medium text-slate-300">{tx("Юзернейм (без @)", "Username (without @)")}</label>
+                        <Input
+                          value={nftListingUsername}
+                          onChange={e => setNftListingUsername(e.target.value.replace(/^@/, "").trim())}
+                          placeholder="durov"
+                          className="mt-1.5 h-11 border-white/10 bg-[#17212b] px-3 text-sm text-slate-100 placeholder:text-slate-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-medium text-slate-300">{tx("Форматы сделки", "Deal formats")}</label>
+                        <div className="mt-2 grid grid-cols-3 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setNftListingSaleEnabled(!nftListingSaleEnabled)}
+                            className={`rounded-xl border p-2.5 text-center text-xs font-medium transition-colors ${nftListingSaleEnabled ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300" : "border-white/10 bg-white/5 text-slate-400"}`}
+                          >
+                            {tx("Продажа", "Sale")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNftListingRentEnabled(!nftListingRentEnabled)}
+                            className={`rounded-xl border p-2.5 text-center text-xs font-medium transition-colors ${nftListingRentEnabled ? "border-[#3f8cff]/50 bg-[#3f8cff]/15 text-[#a6c8ff]" : "border-white/10 bg-white/5 text-slate-400"}`}
+                          >
+                            {tx("Аренда", "Rent")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNftListingInstallmentsEnabled(!nftListingInstallmentsEnabled)}
+                            className={`rounded-xl border p-2.5 text-center text-xs font-medium transition-colors ${nftListingInstallmentsEnabled ? "border-amber-500/50 bg-amber-500/15 text-amber-300" : "border-white/10 bg-white/5 text-slate-400"}`}
+                          >
+                            {tx("Рассрочка", "Installments")}
+                          </button>
+                        </div>
+                      </div>
+
+                      {nftListingSaleEnabled && (
+                        <div className="rounded-xl border border-white/8 bg-white/5 p-3 space-y-2">
+                          <span className="text-xs font-semibold text-emerald-400">{tx("Параметры продажи", "Sale parameters")}</span>
+                          <div>
+                            <label className="text-[11px] text-slate-400">{tx("Цена покупки (TON / GRAM)", "Purchase price (TON / GRAM)")}</label>
+                            <Input
+                              type="number"
+                              value={nftListingPriceTon}
+                              onChange={e => setNftListingPriceTon(e.target.value)}
+                              placeholder="50"
+                              className="mt-1 h-9 border-white/10 bg-[#17212b] px-3 text-sm text-slate-100"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {nftListingRentEnabled && (
+                        <div className="rounded-xl border border-[#3f8cff]/20 bg-[#3f8cff]/8 p-3 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-[#a6c8ff]">{tx("Параметры аренды (Сейф)", "Rental parameters (Vault)")}</span>
+                            <span className="flex items-center gap-1 rounded bg-[#3f8cff]/15 px-1.5 py-0.5 text-[9px] font-medium text-[#c8ddff]">
+                              <Lock className="h-2.5 w-2.5" />
+                              {tx("Без права передачи", "Non-transferable")}
+                            </span>
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-slate-400">{tx("Стоимость аренды в день (TON / GRAM)", "Daily rent (TON / GRAM)")}</label>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={nftListingRentPriceDay}
+                              onChange={e => setNftListingRentPriceDay(e.target.value)}
+                              placeholder="0.5"
+                              className="mt-1 h-9 border-white/10 bg-[#17212b] px-3 text-sm text-slate-100"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[11px] text-slate-400">{tx("Мин. срок (дней)", "Min days")}</label>
+                              <Input
+                                type="number"
+                                value={nftListingRentMinDays}
+                                onChange={e => setNftListingRentMinDays(Number(e.target.value))}
+                                className="mt-1 h-9 border-white/10 bg-[#17212b] px-3 text-sm text-slate-100"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-slate-400">{tx("Макс. срок (дней)", "Max days")}</label>
+                              <Input
+                                type="number"
+                                value={nftListingRentMaxDays}
+                                onChange={e => setNftListingRentMaxDays(Number(e.target.value))}
+                                className="mt-1 h-9 border-white/10 bg-[#17212b] px-3 text-sm text-slate-100"
+                              />
+                            </div>
+                          </div>
+                          <p className="text-[10px] leading-4 text-slate-400">
+                            {tx("🛡️ Механика сейфа (как на Marketapp): при аренде NFT переводится на защищённый смарт-контракт сейфа. Арендатор сможет поставить юзернейм на свой аккаунт/канал, но не сможет украсть или перепродать его.", "🛡️ Vault mechanic: when rented, the NFT is locked in a dedicated vault contract. The renter can bind the username to their account/channel, but cannot steal or transfer it.")}
+                          </p>
+                        </div>
+                      )}
+
+                      {nftListingInstallmentsEnabled && (
+                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 p-3 space-y-3">
+                          <span className="text-xs font-semibold text-amber-400">{tx("Параметры рассрочки", "Installment parameters")}</span>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[11px] text-slate-400">{tx("Первый взнос (TON)", "Down payment (TON)")}</label>
+                              <Input
+                                type="number"
+                                value={nftListingInstallmentDownPayment}
+                                onChange={e => setNftListingInstallmentDownPayment(e.target.value)}
+                                placeholder="15"
+                                className="mt-1 h-9 border-white/10 bg-[#17212b] px-3 text-sm text-slate-100"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[11px] text-slate-400">{tx("Срок выплаты (дней)", "Period (days)")}</label>
+                              <Input
+                                type="number"
+                                value={nftListingInstallmentDays}
+                                onChange={e => setNftListingInstallmentDays(Number(e.target.value))}
+                                className="mt-1 h-9 border-white/10 bg-[#17212b] px-3 text-sm text-slate-100"
+                              />
+                            </div>
+                          </div>
+                          <p className="text-[10px] leading-4 text-slate-400">
+                            {tx("🔒 NFT удерживается в сейфе на период рассрочки до полной выплаты стоимости.", "🔒 The NFT is safely held in the vault until full payment.")}
+                          </p>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={
+                          !nftListingUsername.trim() ||
+                          (!nftListingSaleEnabled && !nftListingRentEnabled && !nftListingInstallmentsEnabled) ||
+                          createNftMutation.isPending
+                        }
+                        onClick={() => {
+                          const modes: string[] = [];
+                          if (nftListingSaleEnabled) modes.push("sale");
+                          if (nftListingRentEnabled) modes.push("rent");
+                          if (nftListingInstallmentsEnabled) modes.push("installments");
+
+                          createNftMutation.mutate({
+                            username: nftListingUsername.trim(),
+                            price: `${nftListingPriceTon} TON`,
+                            priceAmount: Number(nftListingPriceTon) || 0,
+                            rentalPricePerDay: `${nftListingRentPriceDay} TON`,
+                            rentalAmountPerDay: Number(nftListingRentPriceDay) || 0,
+                            minRentalDays: nftListingRentMinDays,
+                            maxRentalDays: nftListingRentMaxDays,
+                            listingType: modes.includes("sale") && modes.includes("rent") ? "both" : modes.includes("rent") ? "rent" : "sale",
+                            assetClass: "offchain",
+                            installmentsEnabled: nftListingInstallmentsEnabled,
+                            installmentsDownPayment: Number(nftListingInstallmentDownPayment) || 0,
+                            installmentsPeriodDays: nftListingInstallmentDays,
+                            installmentsTotalPrice: Number(nftListingPriceTon) || 0,
+                            modes,
+                          });
+                        }}
+                        className="h-11 w-full rounded-xl bg-[#3f8cff] text-sm font-semibold text-white transition-colors hover:bg-[#3377dd] disabled:opacity-45 active:scale-[0.98]"
+                      >
+                        {createNftMutation.isPending ? tx("Публикуем…", "Publishing…") : tx("Опубликовать NFT на маркете", "Publish NFT on Marketplace")}
+                      </button>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+
+                {/* Buy NFT Sheet */}
+                <Sheet open={nftBuySheetOpen} onOpenChange={setNftBuySheetOpen}>
+                  <SheetContent side="bottom" className="rounded-t-[26px] border-white/10 bg-[#10161f] text-slate-100">
+                    <SheetHeader className="px-4 pb-2">
+                      <SheetTitle className="text-slate-100">{tx("Покупка NFT-юзернейма", "Buy NFT Username")}</SheetTitle>
+                    </SheetHeader>
+                    {selectedNftForBuy && (
+                      <div className="space-y-4 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-2">
+                        <div className="rounded-2xl border border-white/8 bg-white/5 p-4 text-center">
+                          <b className="block text-xl font-bold text-slate-100">@{selectedNftForBuy.username}</b>
+                          <span className="mt-1 block text-sm text-slate-400">{tx("Владелец", "Owner")}: {selectedNftForBuy.ownerUsername}</span>
+                          <div className="mt-3 inline-block rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2">
+                            <span className="block text-xs text-slate-400">{tx("Стоимость покупки", "Purchase price")}</span>
+                            <b className="text-lg font-bold text-emerald-300">{selectedNftForBuy.price}</b>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-white/8 bg-[#17212b] p-3">
+                          <div className="flex items-center gap-2 text-xs font-semibold text-[#a6c8ff]">
+                            <ShieldCheck className="h-4 w-4 shrink-0" />
+                            <span>{tx("Защита эскроу-сделкой", "Escrow protected deal")}</span>
+                          </div>
+                          <p className="mt-1.5 text-[11px] leading-4 text-slate-400">
+                            {tx("Сумма покупки депонируется на эскроу. Продавец передает NFT, а после подтверждения получения средства переводятся продавцу. Вы полностью защищены от мошенничества.", "The purchase amount is safely held in escrow. The seller transfers the NFT, and after confirmation, funds are released to the seller.")}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={createNftBuyDealMutation.isPending}
+                          onClick={() => createNftBuyDealMutation.mutate({ nftId: selectedNftForBuy.id })}
+                          className="h-11 w-full rounded-xl bg-emerald-600 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:opacity-45 active:scale-[0.98]"
+                        >
+                          {createNftBuyDealMutation.isPending ? tx("Открываем сделку…", "Opening deal…") : tx("Подтвердить покупку через Эскроу", "Confirm Purchase via Escrow")}
+                        </button>
+                      </div>
+                    )}
+                  </SheetContent>
+                </Sheet>
+
+                {/* Rental Sheet */}
+                <Sheet open={nftRentalSheetOpen} onOpenChange={setNftRentalSheetOpen}>
+                  <SheetContent side="bottom" className="rounded-t-[26px] border-white/10 bg-[#10161f] text-slate-100">
+                    <SheetHeader className="px-4 pb-2">
+                      <SheetTitle className="text-slate-100">{tx("Аренда NFT через Сейф", "Rent NFT via Vault")}</SheetTitle>
+                    </SheetHeader>
+                    {selectedNftForRent && (
+                      <div className="space-y-4 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-2">
+                        <div className="rounded-2xl border border-white/8 bg-white/5 p-4 text-center">
+                          <b className="block text-xl font-bold text-slate-100">@{selectedNftForRent.username}</b>
+                          <span className="mt-1 block text-sm text-slate-400">{selectedNftForRent.rentalPricePerDay} TON / {tx("день", "day")}</span>
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between text-xs text-slate-300">
+                            <span>{tx("Срок аренды (в днях)", "Rental duration (days)")}</span>
+                            <b className="text-[#a6c8ff]">{rentalDaysInput} {tx("дней", "days")}</b>
+                          </div>
+                          <input
+                            type="range"
+                            min={selectedNftForRent.minRentalDays || 1}
+                            max={selectedNftForRent.maxRentalDays || 365}
+                            value={rentalDaysInput}
+                            onChange={e => setRentalDaysInput(Number(e.target.value))}
+                            className="mt-2 w-full accent-[#3f8cff]"
+                          />
+                          <div className="mt-1 flex justify-between text-[10px] text-slate-500">
+                            <span>{selectedNftForRent.minRentalDays} дн.</span>
+                            <span>{selectedNftForRent.maxRentalDays} дн.</span>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/8 p-3">
+                          <div className="flex items-center gap-2 text-xs font-semibold text-emerald-300">
+                            <Lock className="h-4 w-4 shrink-0" />
+                            <span>{tx("Сейф-кошелек (без возможности передачи)", "Vault wallet (non-transferable)")}</span>
+                          </div>
+                          <p className="mt-1.5 text-[11px] leading-4 text-slate-400">
+                            {tx("NFT блокируется в смарт-контракте сейфа. Вы получаете возможность привязать @юзернейм к своему Telegram-аккаунту на оплаченный срок, но передать или продать его нельзя.", "The NFT is locked in a dedicated smart-contract vault. You can bind the @username to your Telegram account, but neither party can transfer or sell it.")}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between rounded-xl bg-white/5 p-3 text-xs">
+                          <span className="text-slate-400">{tx("Итого к оплате:", "Total payment:")}</span>
+                          <b className="text-sm text-emerald-300">
+                            {(rentalDaysInput * (Number(selectedNftForRent.rentalPricePerDay) || 0)).toFixed(2)} TON
+                          </b>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={createNftRentalDeal.isPending}
+                          onClick={() => createNftRentalDeal.mutate({ nftId: selectedNftForRent.id, rentalDays: rentalDaysInput })}
+                          className="h-11 w-full rounded-xl bg-[#3f8cff] text-sm font-semibold text-white transition-colors hover:bg-[#3377dd] disabled:opacity-45 active:scale-[0.98]"
+                        >
+                          {createNftRentalDeal.isPending ? tx("Оформляем…", "Processing…") : tx("Подтвердить аренду в сейф", "Confirm Vault Rental")}
+                        </button>
+                      </div>
+                    )}
+                  </SheetContent>
+                </Sheet>
+
+                {/* Installments Sheet */}
+                <Sheet open={nftInstallmentSheetOpen} onOpenChange={setNftInstallmentSheetOpen}>
+                  <SheetContent side="bottom" className="rounded-t-[26px] border-white/10 bg-[#10161f] text-slate-100">
+                    <SheetHeader className="px-4 pb-2">
+                      <SheetTitle className="text-slate-100">{tx("Покупка в рассрочку через Сейф", "Installment purchase via Vault")}</SheetTitle>
+                    </SheetHeader>
+                    {selectedNftForInstallment && (
+                      <div className="space-y-4 px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-2">
+                        <div className="rounded-2xl border border-white/8 bg-white/5 p-4 text-center">
+                          <b className="block text-xl font-bold text-slate-100">@{selectedNftForInstallment.username}</b>
+                          <div className="mt-2 flex items-center justify-center gap-4 text-xs">
+                            <span className="text-slate-400">{tx("Полная стоимость:", "Total price:")} <b className="text-slate-200">{selectedNftForInstallment.price}</b></span>
+                            <span className="text-slate-400">{tx("Срок:", "Term:")} <b className="text-amber-300">{installmentDaysInput} {tx("дней", "days")}</b></span>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 p-3">
+                          <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
+                            <Lock className="h-4 w-4 shrink-0" />
+                            <span>{tx("Удержание в сейфе до полной выплаты", "Held in vault until fully paid")}</span>
+                          </div>
+                          <p className="mt-1.5 text-[11px] leading-4 text-slate-400">
+                            {tx("После оплаты первого взноса юзернейм блокируется в сейф-кошельке и привязывается к вашему профилю Telegram. После закрытия остатка рассрочки NFT переводится в ваш личный кошелек.", "After the down payment, the username is locked in the vault and bound to your Telegram profile. Once fully paid, the NFT is transferred to your personal wallet.")}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between rounded-xl bg-white/5 p-3 text-xs">
+                          <span className="text-slate-400">{tx("Первый взнос к оплате:", "Down payment due:")}</span>
+                          <b className="text-sm text-amber-300">{installmentDownPaymentInput} TON</b>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={createNftInstallmentDealMutation.isPending}
+                          onClick={() => createNftInstallmentDealMutation.mutate({
+                            nftId: selectedNftForInstallment.id,
+                            downPaymentTon: Number(installmentDownPaymentInput),
+                            periodDays: installmentDaysInput,
+                          })}
+                          className="h-11 w-full rounded-xl bg-amber-600 text-sm font-semibold text-white transition-colors hover:bg-amber-500 disabled:opacity-45 active:scale-[0.98]"
+                        >
+                          {createNftInstallmentDealMutation.isPending ? tx("Оформляем…", "Processing…") : tx("Оформить рассрочку через Сейф", "Initialize Vault Installment")}
+                        </button>
+                      </div>
+                    )}
+                  </SheetContent>
+                </Sheet>
               </section>
             ) : (
             <>
@@ -4213,7 +4634,11 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     const canCancel = isBuyer && (deal.status === "open" || deal.status === "escrow_funded");
                     const canConfirmTransfer = isBuyer && deal.status === "active" && !deal.buyerConfirmedAt;
                     const remainingDays = getDaysRemaining(deal.expiresAt);
-                    const title = deal.dealType === "nft_rent" ? tx("Аренда collectible-юзернейма", "Collectible username rental") : deal.groupUsername ? `@${deal.groupUsername}` : (deal.groupTitle ?? tx("Группа TG TOP", "TG TOP community"));
+                    const title = deal.dealType === "nft_rent"
+                      ? tx("Аренда collectible-юзернейма", "Collectible username rental")
+                      : deal.dealType === "nft_buy"
+                        ? tx("Покупка NFT-юзернейма", "NFT username purchase")
+                        : deal.groupUsername ? `@${deal.groupUsername}` : (deal.groupTitle ?? tx("Группа TG TOP", "TG TOP community"));
                     return (
                       <div key={deal.id} className="px-4 py-3.5">
                         <div className="flex items-start justify-between gap-3">
@@ -4236,8 +4661,14 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                           )}
                           {canCancel && (
                             <button
-                              onClick={() => cancelProtectedGroupDeal.mutate({ dealId: deal.id })}
-                              disabled={cancelProtectedGroupDeal.isPending}
+                              onClick={() => {
+                                if (deal.dealType === "nft_buy") {
+                                  cancelNftBuyMutation.mutate({ dealId: deal.id });
+                                } else {
+                                  cancelProtectedGroupDeal.mutate({ dealId: deal.id });
+                                }
+                              }}
+                              disabled={cancelProtectedGroupDeal.isPending || cancelNftBuyMutation.isPending}
                               className="ml-auto text-[11px] font-medium text-slate-400 underline decoration-white/20 underline-offset-4 disabled:opacity-50"
                             >
                               {tx("Отменить офер", "Cancel offer")}
@@ -4245,8 +4676,14 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                           )}
                           {canConfirmTransfer && (
                             <button
-                              onClick={() => confirmProtectedGroupTransfer.mutate({ dealId: deal.id })}
-                              disabled={confirmProtectedGroupTransfer.isPending}
+                              onClick={() => {
+                                if (deal.dealType === "nft_buy") {
+                                  confirmNftBuyMutation.mutate({ dealId: deal.id });
+                                } else {
+                                  confirmProtectedGroupTransfer.mutate({ dealId: deal.id });
+                                }
+                              }}
+                              disabled={confirmProtectedGroupTransfer.isPending || confirmNftBuyMutation.isPending}
                               className="ml-auto rounded-md border border-[#3f8cff]/35 bg-[#3f8cff]/10 px-2 py-1 text-[10px] font-medium text-[#a6c8ff] disabled:opacity-50"
                             >
                               {tx("Подтвердить получение", "Confirm receipt")}

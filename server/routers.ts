@@ -623,6 +623,11 @@ export const appRouter = router({
         assetClass: z.enum(["onchain", "offchain"]).default("offchain"),
         nftItemAddress: z.string().trim().min(20).max(96).optional(),
         ownerWalletAddress: z.string().trim().min(20).max(96).optional(),
+        installmentsEnabled: z.boolean().optional(),
+        installmentsDownPayment: z.number().optional(),
+        installmentsPeriodDays: z.number().optional(),
+        installmentsTotalPrice: z.number().optional(),
+        modes: z.array(z.string()).optional(),
       }).superRefine((input, context) => {
         if (input.assetClass === "onchain" && !input.nftItemAddress) {
           context.addIssue({ code: "custom", path: ["nftItemAddress"], message: "Укажите адрес On-chain NFT" });
@@ -632,15 +637,36 @@ export const appRouter = router({
         if (!canCreateNftListing(input.assetClass)) {
           throw new Error("Публикация On-chain NFT появится только после подключения независимой проверки владения");
         }
+        const vault = db.getNftVaultAddress(input.username);
+        const metadata = {
+          vaultAddress: vault,
+          modes: input.modes || (input.listingType === "both" ? ["sale", "rent"] : [input.listingType]),
+          installments: input.installmentsEnabled ? {
+            downPayment: String(input.installmentsDownPayment ?? (input.priceAmount * 0.3).toFixed(2)),
+            periodDays: input.installmentsPeriodDays ?? 30,
+            totalPrice: String(input.installmentsTotalPrice ?? input.priceAmount),
+          } : undefined,
+          verification: input.assetClass === "offchain" ? "tg-top-internal" : "onchain-verified",
+        };
         await db.createNftListing({
-          ...input,
+          username: input.username,
+          price: input.price,
+          priceAmount: input.priceAmount,
+          rentalPricePerDay: input.rentalPricePerDay,
+          rentalAmountPerDay: input.rentalAmountPerDay,
+          minRentalDays: input.minRentalDays,
+          maxRentalDays: input.maxRentalDays,
+          listingType: input.listingType,
+          assetClass: input.assetClass,
+          nftItemAddress: input.nftItemAddress,
+          ownerWalletAddress: input.ownerWalletAddress,
           ownerOpenId: ctx.user.openId,
           ownerUsername: ctx.user.name || ctx.user.openId.slice(0, 8),
           ownershipVerifiedAt: input.assetClass === "offchain" ? new Date() : null,
-          ownershipVerification: input.assetClass === "offchain" ? "tg-top-internal" : null,
+          ownershipVerification: JSON.stringify(metadata).slice(0, 255),
           status: "available",
         });
-        return { success: true };
+        return { success: true, vaultAddress: vault };
       }),
 
     createNftRentalDeal: protectedProcedure
@@ -652,6 +678,23 @@ export const appRouter = router({
     confirmNftRental: protectedProcedure
       .input(z.object({ dealId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => db.confirmNftRental(input.dealId, ctx.user.openId)),
+
+    createNftBuyDeal: protectedProcedure
+      .input(z.object({ nftId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => db.createNftBuyDeal(input.nftId, ctx.user.openId)),
+    createNftInstallmentDeal: protectedProcedure
+      .input(z.object({
+        nftId: z.number().int().positive(),
+        downPaymentTon: z.number().optional(),
+        periodDays: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => db.createNftInstallmentDeal(input.nftId, ctx.user.openId, input)),
+    confirmNftBuy: protectedProcedure
+      .input(z.object({ dealId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => db.confirmNftBuy(input.dealId, ctx.user.openId)),
+    cancelNftBuy: protectedProcedure
+      .input(z.object({ dealId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => db.cancelNftBuy(input.dealId, ctx.user.openId)),
 
     createProtectedGroupDeal: protectedProcedure
       .input(z.object({ groupId: z.number() }))

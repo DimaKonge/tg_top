@@ -22,6 +22,8 @@ import { getTonPayoutTransactionByMessageHash } from "./tonPayoutNetwork";
 import { getConfiguredTonPayoutWalletAddress } from "./tonPayoutConfig";
 import { classifyTonWithdrawalRisk, formatNanoTon as formatWithdrawalNanoTon, getTonWithdrawalRiskLabel, quoteTonWithdrawal as getTonWithdrawalQuote, TON_WITHDRAWAL_ADDRESS_COOLDOWN_MS, TON_WITHDRAWAL_FEE_SAFETY_MARGIN_NANO } from "./tonWithdrawalPolicy";
 import { canCancelNftRental, canConfirmNftRental, rentalTotalUnits, validateRentalDays, NFT_RENTAL_MAX_DAYS as POLICY_NFT_RENTAL_MAX_DAYS } from "./nftRentalPolicy";
+import { getNftVaultAddress, tryParseNftMetadata, validateInstallmentTerms } from "./nftMarketplacePolicy";
+export { getNftVaultAddress } from "./nftMarketplacePolicy";
 import { normalizeTelegramBotLink } from "./botListingPolicy";
 import { canIssueOnboardingIntent, getOnboardingIntentWindow, isPendingOnboardingIntent, ONBOARDING_INTENT_TTL_MS, ONBOARDING_INTENT_WINDOW_MS, type TelegramOnboardingKind } from "./onboardingIntentPolicy";
 import { CARD_BACKGROUND_PRESET_IDS, type CardBackgroundPreset } from "../shared/card-background-presets";
@@ -3136,14 +3138,30 @@ export async function unlistGroups(ownerOpenId: string, groupIds: number[]) {
   });
 }
 
+function enrichNftRow<T extends typeof nftUsernames.$inferSelect>(nft: T) {
+  const meta = tryParseNftMetadata(nft.ownershipVerification);
+  return {
+    ...nft,
+    vaultAddress: meta?.vaultAddress || getNftVaultAddress(nft.username, nft.id),
+    installmentsAvailable: Boolean(meta?.installments),
+    installmentsDownPayment: meta?.installments?.downPayment ?? null,
+    installmentsPeriodDays: meta?.installments?.periodDays ?? null,
+    installmentsTotalPrice: meta?.installments?.totalPrice ?? null,
+    modes: meta?.modes ?? (nft.listingType === "both" ? ["sale", "rent"] : [nft.listingType]),
+  };
+}
+
 export async function getNftUsernames(ownerOpenId?: string) {
   const db = await getDb();
   if (!db) return [];
   if (ownerOpenId) {
-    return await db.select().from(nftUsernames).where(eq(nftUsernames.ownerOpenId, ownerOpenId)).orderBy(desc(nftUsernames.createdAt));
+    const rows = await db.select().from(nftUsernames).where(eq(nftUsernames.ownerOpenId, ownerOpenId)).orderBy(desc(nftUsernames.createdAt));
+    return rows.map(enrichNftRow);
   }
   const rows = await db.select().from(nftUsernames).where(eq(nftUsernames.status, "available")).orderBy(desc(nftUsernames.createdAt));
-  return rows.filter(nft => canPublishNftListing({ assetClass: nft.assetClass, ownershipVerifiedAt: nft.ownershipVerifiedAt }));
+  return rows
+    .filter(nft => canPublishNftListing({ assetClass: nft.assetClass, ownershipVerifiedAt: nft.ownershipVerifiedAt }))
+    .map(enrichNftRow);
 }
 
 export async function createNftListing(data: InsertNftUsername) {
@@ -3265,11 +3283,15 @@ export async function getUserDeals(openId: string) {
   return await db.select({
     id: deals.id,
     groupId: deals.groupId,
+    nftId: deals.nftId,
     buyerOpenId: deals.buyerOpenId,
     sellerOpenId: deals.sellerOpenId,
     price: deals.price,
     dealType: deals.dealType,
+    rentalDays: deals.rentalDays,
     status: deals.status,
+    fundingReference: deals.fundingReference,
+    transferEvidence: deals.transferEvidence,
     fundedAt: deals.fundedAt,
     transferObservedAt: deals.transferObservedAt,
     buyerConfirmedAt: deals.buyerConfirmedAt,
@@ -3278,8 +3300,10 @@ export async function getUserDeals(openId: string) {
     createdAt: deals.createdAt,
     groupTitle: groupsCatalog.title,
     groupUsername: groupsCatalog.username,
+    nftUsername: nftUsernames.username,
   }).from(deals)
     .leftJoin(groupsCatalog, eq(deals.groupId, groupsCatalog.id))
+    .leftJoin(nftUsernames, eq(deals.nftId, nftUsernames.id))
     .where(or(eq(deals.buyerOpenId, openId), eq(deals.sellerOpenId, openId)))
     .orderBy(desc(deals.createdAt));
 }
@@ -3294,7 +3318,10 @@ export async function createProtectedGroupDeal(groupId: number, buyerOpenId: str
   if (group.ownerOpenId === buyerOpenId) throw new Error("Нельзя купить собственную группу");
   const priceUnits = Math.round(Number(group.salePriceTon) * 100);
   const buyer = await getUserByOpenId(buyerOpenId);
-  if (!hasSufficientGramBalance(buyer?.bonusBalance ?? 0, priceUnits)) {
+  const buyerMainUnits = Math.round(Number(buyer?.mainBalanceTon ?? 0) * 100);
+  const buyerBonusUnits = buyer?.bonusBalance ?? 0;
+  const buyerTotalUnits = buyerMainUnits + buyerBonusUnits;
+  if (!hasSufficientGramBalance(buyerTotalUnits, priceUnits)) {
     throw new Error(INSUFFICIENT_GRAM_BALANCE_MESSAGE);
   }
   const [existing] = await db.select().from(deals).where(and(
@@ -3456,3 +3483,124 @@ export async function cancelNftRental(dealId: number, buyerOpenId: string) {
   await db.update(deals).set({ status: "cancelled", cancelledAt: new Date() }).where(and(eq(deals.id, dealId), eq(deals.buyerOpenId, buyerOpenId), eq(deals.status, deal.status)));
   return { requiresEscrowRefund: deal.status === "escrow_funded", noAssetTransfer: true };
 }
+
+export async function createNftBuyDeal(nftId: number, buyerOpenId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [nft] = await db.select().from(nftUsernames).where(eq(nftUsernames.id, nftId)).limit(1);
+  if (!nft || nft.status !== "available" || (nft.listingType !== "sale" && nft.listingType !== "both")) {
+    throw new Error("Collectible-юзернейм недоступен для покупки");
+  }
+  if (nft.ownerOpenId === buyerOpenId) throw new Error("Нельзя купить собственный юзернейм");
+  const priceUnits = nft.priceAmount || Math.round(Number(nft.price) * 100);
+  const buyer = await getUserByOpenId(buyerOpenId);
+  const buyerMainUnits = Math.round(Number(buyer?.mainBalanceTon ?? 0) * 100);
+  const buyerBonusUnits = buyer?.bonusBalance ?? 0;
+  const buyerTotalUnits = buyerMainUnits + buyerBonusUnits;
+  if (!hasSufficientGramBalance(buyerTotalUnits, priceUnits)) {
+    throw new Error(INSUFFICIENT_GRAM_BALANCE_MESSAGE);
+  }
+  const [existing] = await db.select().from(deals).where(and(
+    eq(deals.nftId, nftId),
+    eq(deals.buyerOpenId, buyerOpenId),
+    eq(deals.dealType, "nft_buy"),
+    eq(deals.status, "open")
+  )).limit(1);
+  if (existing) return { deal: existing, nft, requiresEscrowFunding: true };
+
+  await db.insert(deals).values({
+    nftId,
+    buyerOpenId,
+    sellerOpenId: nft.ownerOpenId,
+    price: String(priceUnits),
+    dealType: "nft_buy",
+    status: "open",
+    fundingReference: `nft_buy_${Date.now()}_${randomBytes(6).toString("hex")}`,
+  });
+  const [deal] = await db.select().from(deals).where(and(
+    eq(deals.nftId, nftId),
+    eq(deals.buyerOpenId, buyerOpenId),
+    eq(deals.dealType, "nft_buy"),
+    eq(deals.status, "open")
+  )).orderBy(desc(deals.id)).limit(1);
+  return { deal, nft, requiresEscrowFunding: true };
+}
+
+export async function createNftInstallmentDeal(nftId: number, buyerOpenId: string, options?: { downPaymentTon?: number; periodDays?: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [nft] = await db.select().from(nftUsernames).where(eq(nftUsernames.id, nftId)).limit(1);
+  if (!nft || nft.status !== "available") {
+    throw new Error("Collectible-юзернейм недоступен для оформления рассрочки");
+  }
+  if (nft.ownerOpenId === buyerOpenId) throw new Error("Нельзя купить собственный юзернейм");
+  const meta = tryParseNftMetadata(nft.ownershipVerification);
+  const downPaymentTon = options?.downPaymentTon ?? Number(meta?.installments?.downPayment ?? (Number(nft.price) * 0.3).toFixed(2));
+  const periodDays = options?.periodDays ?? Number(meta?.installments?.periodDays ?? 30);
+  const totalPriceTon = Number(meta?.installments?.totalPrice ?? nft.price);
+
+  const downPaymentUnits = Math.round(downPaymentTon * 100);
+  const buyer = await getUserByOpenId(buyerOpenId);
+  const buyerMainUnits = Math.round(Number(buyer?.mainBalanceTon ?? 0) * 100);
+  const buyerBonusUnits = buyer?.bonusBalance ?? 0;
+  const buyerTotalUnits = buyerMainUnits + buyerBonusUnits;
+  if (!hasSufficientGramBalance(buyerTotalUnits, downPaymentUnits)) {
+    throw new Error(INSUFFICIENT_GRAM_BALANCE_MESSAGE);
+  }
+
+  const [existing] = await db.select().from(deals).where(and(
+    eq(deals.nftId, nftId),
+    eq(deals.buyerOpenId, buyerOpenId),
+    eq(deals.dealType, "nft_buy"),
+    eq(deals.status, "open")
+  )).limit(1);
+  if (existing) return { deal: existing, nft, requiresEscrowFunding: true, installment: true };
+
+  const vault = meta?.vaultAddress || getNftVaultAddress(nft.username, nft.id);
+  const evidence = JSON.stringify({
+    installment: true,
+    totalPriceTon,
+    downPaymentTon,
+    periodDays,
+    vaultAddress: vault,
+    nonTransferableUntilSettled: true,
+  });
+
+  await db.insert(deals).values({
+    nftId,
+    buyerOpenId,
+    sellerOpenId: nft.ownerOpenId,
+    price: String(downPaymentUnits),
+    dealType: "nft_buy",
+    status: "open",
+    fundingReference: `nft_inst_${Date.now()}_${randomBytes(6).toString("hex")}`,
+    transferEvidence: evidence.slice(0, 512),
+  });
+  const [deal] = await db.select().from(deals).where(and(
+    eq(deals.nftId, nftId),
+    eq(deals.buyerOpenId, buyerOpenId),
+    eq(deals.dealType, "nft_buy"),
+    eq(deals.status, "open")
+  )).orderBy(desc(deals.id)).limit(1);
+  return { deal, nft, requiresEscrowFunding: true, installment: true, vaultAddress: vault };
+}
+
+export async function confirmNftBuy(dealId: number, buyerOpenId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [deal] = await db.select().from(deals).where(and(eq(deals.id, dealId), eq(deals.buyerOpenId, buyerOpenId), eq(deals.dealType, "nft_buy"))).limit(1);
+  if (!deal) throw new Error("Сделка не найдена");
+  if (deal.buyerConfirmedAt) return { settlementLocked: true, alreadyConfirmed: true };
+  await db.update(deals).set({ buyerConfirmedAt: new Date(), status: "completed" }).where(and(eq(deals.id, dealId), eq(deals.buyerOpenId, buyerOpenId)));
+  return { settlementLocked: true, alreadyConfirmed: false };
+}
+
+export async function cancelNftBuy(dealId: number, buyerOpenId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [deal] = await db.select().from(deals).where(and(eq(deals.id, dealId), eq(deals.buyerOpenId, buyerOpenId), eq(deals.dealType, "nft_buy"))).limit(1);
+  if (!deal || (deal.status !== "open" && deal.status !== "escrow_funded")) throw new Error("Эту сделку уже нельзя отменить");
+  await db.update(deals).set({ status: "cancelled", cancelledAt: new Date() }).where(and(eq(deals.id, dealId), eq(deals.buyerOpenId, buyerOpenId), eq(deals.status, deal.status)));
+  return { requiresEscrowRefund: deal.status === "escrow_funded", noAssetTransfer: true };
+}
+

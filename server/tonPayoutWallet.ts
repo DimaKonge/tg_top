@@ -114,9 +114,9 @@ export async function emulateTonPayoutFee(boc: string) {
   });
   if (!response.ok) throw new Error("Не удалось безопасно оценить комиссию сети");
   const payload = await response.json() as {
-    transaction?: { total_fees?: string | number | null };
-    trace?: { transaction?: { total_fees?: string | number | null } };
-    transactions?: Array<{ total_fees?: string | number | null }>;
+    transaction?: { total_fees?: string | number | null; success?: boolean };
+    trace?: { transaction?: { total_fees?: string | number | null; success?: boolean } };
+    transactions?: Array<{ total_fees?: string | number | null; success?: boolean }>;
   };
   const success = payload.transaction?.success
     ?? payload.trace?.transaction?.success

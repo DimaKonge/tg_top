@@ -30,12 +30,12 @@ export async function notifyRewardCredited(input: { telegramUserId: number; grou
   if (!botToken) return false;
   const amount = (input.amount / 100).toFixed(2).replace(/\.?0+$/, "");
   const text = [
-    "🎉 Бонус начислен!",
+    "✅ GRAM зачислены на баланс",
     "",
-    `+${amount} GRAM за вступление в группу ${input.groupTitle}`,
-    input.reason ? `(${input.reason})` : "",
+    `+${amount} GRAM · ${input.groupTitle}`,
+    input.reason ? `Основание: ${input.reason}` : "",
     "",
-    "Откройте TG TOP, чтобы просмотреть ваш баланс.",
+    "Баланс и история в TG TOP обновятся автоматически.",
   ].filter(line => line !== "").join("\n");
   try {
     const response = await axios.post<{ ok: boolean }>(`https://api.telegram.org/bot${botToken}/sendMessage`, {
