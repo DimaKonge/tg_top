@@ -16,6 +16,7 @@ import { countSuccessfulTelegramAnnouncements } from "./listingAnnouncementPolic
 import { telegramUserAgentRouter } from "./routers/telegramUserAgentRouter";
 import { financeProcedures } from "./routers/financeRouter";
 import { supportRouter } from "./routers/supportRouter";
+import * as auctionService from "./modules/auction";
 import { getTelegramIdFromOpenId } from "./onboardingIntentPolicy";
 import { canRefreshGroupMediaSnapshot, shouldUpdateAnimatedAvatarSnapshot } from "./groupMediaSnapshotPolicy";
 import { CARD_BACKGROUND_PRESET_IDS, type CardBackgroundPreset } from "../shared/card-background-presets";
@@ -90,7 +91,7 @@ export const appRouter = router({
     getSlots: publicProcedure
       .input(z.object({ category: z.string().optional(), country: z.string().optional(), subcategory: z.string().optional(), city: z.string().optional() }).optional())
       .query(async ({ input }) => {
-        return await db.getAuctionSlots(input?.category, input?.country, input?.subcategory, input?.city);
+        return await auctionService.getAuctionSlots(input?.category, input?.country, input?.subcategory, input?.city);
       }),
 
     placeBid: protectedProcedure
@@ -119,7 +120,7 @@ export const appRouter = router({
         if (!group || group.ownerOpenId !== ctx.user.openId) {
           throw new Error("Выберите свою группу из личной папки");
         }
-        const intent = await db.payRankingBidWithGramCredit(
+        const intent = await auctionService.payRankingBidWithGramCredit(
           input.slotId,
           Math.round(input.bidAmount * 1000),
           `${formatTonAmount(input.bidAmount)} GRAM`,
@@ -163,7 +164,7 @@ export const appRouter = router({
     createStarsRankingPayment: protectedProcedure
       .input(z.object({ slotId: z.number().int().positive(), groupId: z.number().int().positive(), bidAmount: z.number().positive().max(1_000) }))
       .mutation(async ({ ctx, input }) => {
-        const intent = await db.createStarsRankingPaymentIntent({
+        const intent = await auctionService.createStarsRankingPaymentIntent({
           userOpenId: ctx.user.openId,
           slotId: input.slotId,
           groupId: input.groupId,

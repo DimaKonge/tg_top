@@ -1404,7 +1404,7 @@ function getRankingRewardBudgetAdjustment(group: typeof groupsCatalog.$inferSele
   };
 }
 
-type RankingCreditDebit = {
+export type RankingCreditDebit = {
   spendUnits: number;
   reservedRewardBudget: number;
   releasedRewardBudget: number;
