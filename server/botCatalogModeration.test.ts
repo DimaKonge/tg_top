@@ -56,9 +56,11 @@ describe("bot catalog moderation contract", () => {
 
   it("offers the compact public bot submission sheet", () => {
     const homeSource = readFileSync(new URL("../client/src/pages/Home.tsx", import.meta.url), "utf8");
-    expect(homeSource).toContain("botListingSheetOpen, setBotListingSheetOpen");
-    expect(homeSource).toContain("setBotListingSheetOpen(true)");
-    expect(homeSource).toContain("submitBotListing.mutate({ telegramLink: botTelegramLinkDraft })");
-    expect(homeSource).toContain("Отправить на проверку");
+    const botSheetSource = readFileSync(new URL("../client/src/components/bots/BotListingSheet.tsx", import.meta.url), "utf8");
+    const source = `${homeSource}\n${botSheetSource}`;
+    expect(source).toContain("botListingSheetOpen, setBotListingSheetOpen");
+    expect(source).toContain("setBotListingSheetOpen(true)");
+    expect(source).toContain("submitBotListing.mutate({ telegramLink: botTelegramLinkDraft })");
+    expect(source).toContain("Отправить на проверку");
   });
 });

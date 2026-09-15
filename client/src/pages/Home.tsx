@@ -1719,10 +1719,15 @@ export default function Home({ onReady }: { onReady?: () => void }) {
     },
     [nfts, nftAssetFilter, nftMarketCategory, nftDealCategory, topSearchQuery]
   );
-  const compactRankedSlots = useMemo(
-    () => slots.filter(slot => slot.group && matchesAudience(slot.group)),
-    [slots, audience]
-  );
+  const compactRankedSlots = useMemo(() => {
+    const seen = new Set<number>();
+    return slots.filter(slot => {
+      if (!slot.group || !matchesAudience(slot.group)) return false;
+      if (seen.has(slot.group.id)) return false;
+      seen.add(slot.group.id);
+      return true;
+    });
+  }, [slots, audience]);
   const fallbackRankedGroups = useMemo(() => {
     const rankedIds = new Set(compactRankedSlots.flatMap(slot => slot.group ? [slot.group.id] : []));
     return visibleGroups.filter(group => !rankedIds.has(group.id));

@@ -216,6 +216,43 @@ async function startServer() {
   server.listen(port, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${port}/`);
     console.log(`Server listening on http://0.0.0.0:${port}/`);
+
+    // Clean up any historical duplicate slots on startup
+    void (async () => {
+      try {
+        const db = await getDb();
+        if (db) {
+          const { auctionSlots } = await import("../../drizzle/schema");
+          const { isNotNull, inArray } = await import("drizzle-orm");
+          const slots = await db.select().from(auctionSlots).where(isNotNull(auctionSlots.groupId)).orderBy(auctionSlots.slotNumber);
+          const seen = new Set<number>();
+          const duplicateIds: number[] = [];
+          for (const slot of slots) {
+            if (!slot.groupId) continue;
+            if (seen.has(slot.groupId)) {
+              duplicateIds.push(slot.id);
+            } else {
+              seen.add(slot.groupId);
+            }
+          }
+          if (duplicateIds.length > 0) {
+            await db.update(auctionSlots).set({
+              groupId: null,
+              leaderUserId: null,
+              leaderUsername: "-",
+              currentBid: "0 GRAM",
+              bidAmount: 0,
+              title: "Свободное место",
+              subtitle: "Ждет листинга",
+              updatedAt: new Date(),
+            }).where(inArray(auctionSlots.id, duplicateIds));
+            console.log(`[Boot] Deduplication cleaned up ${duplicateIds.length} duplicate slots.`);
+          }
+        }
+      } catch (err) {
+        console.warn("[Boot] Automatic slot deduplication skipped:", err);
+      }
+    })();
   });
 
   const handleShutdown = (signal: string) => {

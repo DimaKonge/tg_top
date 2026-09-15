@@ -34,8 +34,22 @@ export function sortRankingEntriesByBid<T extends RankingEntry>(entries: T[]) {
   });
 }
 
+export function deduplicateRankingEntries<T extends RankingEntry>(entries: T[]): T[] {
+  const sorted = sortRankingEntriesByBid(entries);
+  const seenGroupIds = new Set<number>();
+  const uniqueEntries: T[] = [];
+  for (const entry of sorted) {
+    if (entry.groupId !== null && entry.groupId !== undefined) {
+      if (seenGroupIds.has(entry.groupId)) continue;
+      seenGroupIds.add(entry.groupId);
+    }
+    uniqueEntries.push(entry);
+  }
+  return uniqueEntries;
+}
+
 export function assignRankingEntriesToSlots<T extends RankingEntry>(entries: T[], slots: Array<{ slotNumber: number }>) {
-  const remaining = sortRankingEntriesByBid(entries);
+  const remaining = deduplicateRankingEntries(entries);
   return slots.map(slot => {
     const entryIndex = remaining.findIndex(entry => entry.bidAmount >= getRankingFloorMilliTon(slot.slotNumber));
     return entryIndex >= 0 ? remaining.splice(entryIndex, 1)[0] : undefined;

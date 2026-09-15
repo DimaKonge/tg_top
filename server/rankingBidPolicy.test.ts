@@ -71,4 +71,13 @@ describe("TG TOP paid ranking policy", () => {
     ], [{ slotNumber: 1 }, { slotNumber: 2 }, { slotNumber: 3 }, { slotNumber: 4 }]);
     expect(assigned.map(entry => entry?.groupId ?? null)).toEqual([3, 2, 1, null]);
   });
+
+  it("never duplicates the same group across multiple ranking slots", () => {
+    const assigned = assignRankingEntriesToSlots([
+      { groupId: 1, bidAmount: 100, heldSince: new Date("2026-08-19T10:00:00Z") },
+      { groupId: 1, bidAmount: 100, heldSince: new Date("2026-08-19T10:05:00Z") },
+      { groupId: 2, bidAmount: 200, heldSince: new Date("2026-08-19T10:01:00Z") },
+    ], [{ slotNumber: 1 }, { slotNumber: 2 }, { slotNumber: 3 }, { slotNumber: 4 }]);
+    expect(assigned.map(entry => entry?.groupId ?? null)).toEqual([2, 1, null, null]);
+  });
 });

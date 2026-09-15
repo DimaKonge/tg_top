@@ -139,8 +139,9 @@ describe("normalizeGroupListingOptions", () => {
     const listing = source.slice(start, end);
 
     expect(listing).toContain("const debitUnits = totalCost + reservedRewardBudget - releasedRewardBudget;");
-    expect(listing).toContain("gte(users.bonusBalance, debitUnits)");
-    expect(listing).toContain('if (!debit[0]?.affectedRows) throw new Error("Недостаточно бонусных GRAM")');
+    expect(listing).toContain("bonusBalance: users.bonusBalance");
+    expect(listing).toContain("mainBalanceTon: users.mainBalanceTon");
+    expect(listing).toContain('if (!debit[0]?.affectedRows) throw new Error("Недостаточно средств на балансе")');
     expect(listing).not.toContain("const user = await getUserByOpenId(ownerOpenId);");
   });
 });

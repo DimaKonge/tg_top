@@ -41,7 +41,7 @@ describe("TG TOP workspace wallet NFT view", () => {
     expect(source).toContain('["domains", tx("Домены", "Domains")]');
     expect(source).toContain('["other", tx("Другие", "Other")]');
     expect(source).toContain('Подпись, перевод и продажа не запрашиваются.');
-    expect(source).toContain('<WalletNftCard key={item.address} item={item} language={language} />');
+    expect(source).toContain('<WalletNftCard key={item.address} item={item} language={language}');
   });
 
   it("does not reuse an unowned TON Connect session across Telegram accounts", () => {

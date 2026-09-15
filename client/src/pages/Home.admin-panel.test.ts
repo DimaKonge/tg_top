@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 
 describe("TG TOP admin panel", () => {
   it("shows a role-gated fourth navigation cell with a live active-listing feed", () => {
-    const source = readFileSync(new URL("./Home.tsx", import.meta.url), "utf8");
+    const homeSource = readFileSync(new URL("./Home.tsx", import.meta.url), "utf8");
+    const botCategorySource = readFileSync(new URL("../components/bots/BotCategorySheet.tsx", import.meta.url), "utf8");
+    const source = `${homeSource}\n${botCategorySource}`;
     const domainSource = readFileSync(new URL("../lib/tgTop-domain.ts", import.meta.url), "utf8");
 
     expect(domainSource).toContain('export type Page = "top" | "catalog" | "giveaways" | "mine" | "details" | "owner" | "profile" | "admin"');

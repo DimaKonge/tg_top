@@ -1352,12 +1352,18 @@ export async function getAuctionSlots(category?: string, country?: string, subca
     },
   ];
   }));
+  const seenGroupIds = new Set<number>();
   return slots.map(slot => {
     const isOccupied = slot.groupId !== null;
     const group = slot.groupId ? groupMap.get(slot.groupId) ?? null : null;
-    return group
-      ? { ...slot, isOccupied: true, group }
-      : { ...slot, bidAmount: 0, currentBid: "0 GRAM", leaderUsername: "-", leaderUserId: null, groupId: null, title: "Свободное место", subtitle: "Ждет листинга", isOccupied: false, group: null };
+    if (group) {
+      if (seenGroupIds.has(group.id)) {
+        return { ...slot, bidAmount: 0, currentBid: "0 GRAM", leaderUsername: "-", leaderUserId: null, groupId: null, title: "Свободное место", subtitle: "Ждет листинга", isOccupied: false, group: null };
+      }
+      seenGroupIds.add(group.id);
+      return { ...slot, isOccupied: true, group };
+    }
+    return { ...slot, bidAmount: 0, currentBid: "0 GRAM", leaderUsername: "-", leaderUserId: null, groupId: null, title: "Свободное место", subtitle: "Ждет листинга", isOccupied: false, group: null };
   });
 }
 
@@ -1490,25 +1496,42 @@ export async function placeBid(slotId: number, bidAmount: number, currentBidStr:
         }
       : undefined;
     if (creditDebit) {
-      const spendTon = creditDebit.spendUnits / 100;
-      if (spendTon > 0) {
-        const balanceTon = await tx.update(users).set({ mainBalanceTon: sql`${users.mainBalanceTon} - ${spendTon}` }).where(and(eq(users.openId, leaderUserId), gte(users.mainBalanceTon, spendTon.toString())));
-        if (Number(balanceTon[0]?.affectedRows ?? 0) !== 1) {
-          throw new Error(`Недостаточно TON на балансе. Нужно ${spendTon} TON`);
-        }
-        await tx.insert(creditTransactions).values({ userOpenId: leaderUserId, groupId: groupId ?? null, amount: -creditDebit.spendUnits, kind: "ranking_spend" });
+      const totalDebit = creditDebit.spendUnits + creditDebit.reservedRewardBudget - creditDebit.releasedRewardBudget;
+      const [payer] = await tx.select({
+        bonusBalance: users.bonusBalance,
+        mainBalanceTon: users.mainBalanceTon,
+      }).from(users).where(eq(users.openId, leaderUserId));
+      if (!payer) throw new Error("Пользователь не найден");
+
+      const payerBonus = Math.max(0, payer.bonusBalance ?? 0);
+      const payerMainUnits = Math.floor(Math.round(Number(payer.mainBalanceTon ?? 0) * 100));
+      const totalAvailable = payerBonus + payerMainUnits;
+
+      if (totalDebit > totalAvailable) {
+        throw new Error(`Недостаточно GRAM на балансе. Нужно ${formatTonAmount(totalDebit / 100)} GRAM`);
       }
 
-      const rewardDebitUnits = creditDebit.reservedRewardBudget - creditDebit.releasedRewardBudget;
-      if (rewardDebitUnits > 0) {
-        const balanceBonus = await tx.update(users).set({ bonusBalance: sql`${users.bonusBalance} - ${rewardDebitUnits}` }).where(and(eq(users.openId, leaderUserId), gte(users.bonusBalance, rewardDebitUnits)));
-        if (Number(balanceBonus[0]?.affectedRows ?? 0) !== 1) {
-          throw new Error(`Недостаточно бонусных GRAM на балансе. Нужно ${rewardDebitUnits / 100} GRAM`);
-        }
-      } else if (rewardDebitUnits < 0) {
-        await tx.update(users).set({ bonusBalance: sql`${users.bonusBalance} + ${Math.abs(rewardDebitUnits)}` }).where(eq(users.openId, leaderUserId));
+      let bonusDebit = 0;
+      let mainDebitUnits = 0;
+      if (totalDebit > 0) {
+        bonusDebit = Math.min(payerBonus, totalDebit);
+        mainDebitUnits = totalDebit - bonusDebit;
+      } else if (totalDebit < 0) {
+        bonusDebit = totalDebit;
       }
+      const mainDebitTon = mainDebitUnits / 100;
 
+      const balance = await tx.update(users).set({
+        bonusBalance: sql`${users.bonusBalance} - ${bonusDebit}`,
+        ...(mainDebitTon > 0 ? { mainBalanceTon: sql`${users.mainBalanceTon} - ${mainDebitTon}` } : {}),
+      }).where(and(
+        eq(users.openId, leaderUserId),
+        gte(users.bonusBalance, bonusDebit),
+        ...(mainDebitTon > 0 ? [gte(users.mainBalanceTon, mainDebitTon.toString())] : [])
+      ));
+      if (!balance[0]?.affectedRows) throw new Error(`Недостаточно GRAM на балансе. Нужно ${formatTonAmount(totalDebit / 100)} GRAM`);
+
+      if (creditDebit.spendUnits) await tx.insert(creditTransactions).values({ userOpenId: leaderUserId, groupId: groupId ?? null, amount: -creditDebit.spendUnits, kind: "ranking_spend" });
       if (creditDebit.reservedRewardBudget) await tx.insert(creditTransactions).values({ userOpenId: leaderUserId, groupId: groupId ?? null, amount: -creditDebit.reservedRewardBudget, kind: "reward_campaign_reserve" });
       if (creditDebit.releasedRewardBudget) await tx.insert(creditTransactions).values({ userOpenId: leaderUserId, groupId: groupId ?? null, amount: creditDebit.releasedRewardBudget, kind: "reward_campaign_release" });
     }
@@ -2914,27 +2937,43 @@ export async function listGroupsWithCredits(ownerOpenId: string, groupIds: numbe
   const totalCost = groupsNeedingListing.length * cost;
   const reservedRewardBudget = rewardConfig && rewardGroup ? Math.max(0, rewardConfig.rewardBudget - rewardGroup.rewardBudget) : 0;
   const releasedRewardBudget = rewardConfig && rewardGroup ? Math.max(0, rewardGroup.rewardBudget - rewardConfig.rewardBudget) : 0;
-  const totalCostTon = totalCost / 100;
-  const rewardDebitUnits = reservedRewardBudget - releasedRewardBudget;
+  const debitUnits = totalCost + reservedRewardBudget - releasedRewardBudget;
 
   await db.transaction(async tx => {
-    if (totalCostTon > 0) {
-      const debitTon = await tx.update(users).set({ mainBalanceTon: sql`${users.mainBalanceTon} - ${totalCostTon}` }).where(and(
-        eq(users.openId, ownerOpenId),
-        gte(users.mainBalanceTon, totalCostTon.toString()),
-      ));
-      if (!debitTon[0]?.affectedRows) throw new Error("Недостаточно TON на балансе");
+    const user = (await tx.select({
+      bonusBalance: users.bonusBalance,
+      mainBalanceTon: users.mainBalanceTon,
+    }).from(users).where(eq(users.openId, ownerOpenId)).limit(1))[0];
+    if (!user) throw new Error("Пользователь не найден");
+
+    const bonusAvailable = Math.max(0, user.bonusBalance ?? 0);
+    const mainAvailableUnits = Math.floor(Math.round(Number(user.mainBalanceTon ?? 0) * 100));
+    const totalAvailable = bonusAvailable + mainAvailableUnits;
+
+    let bonusDebit = 0;
+    let mainDebit = 0;
+    if (debitUnits > 0) {
+      if (debitUnits > totalAvailable) {
+        throw new Error(`Недостаточно средств на балансе. Нужно ${formatTonAmount(debitUnits / 100)} GRAM`);
+      }
+      bonusDebit = Math.min(bonusAvailable, debitUnits);
+      const mainDebitUnits = debitUnits - bonusDebit;
+      if (mainDebitUnits > 0) {
+        mainDebit = mainDebitUnits / 100;
+      }
+    } else if (debitUnits < 0) {
+      bonusDebit = debitUnits;
     }
 
-    if (rewardDebitUnits > 0) {
-      const debitBonus = await tx.update(users).set({ bonusBalance: sql`${users.bonusBalance} - ${rewardDebitUnits}` }).where(and(
-        eq(users.openId, ownerOpenId),
-        gte(users.bonusBalance, rewardDebitUnits),
-      ));
-      if (!debitBonus[0]?.affectedRows) throw new Error("Недостаточно бонусных GRAM");
-    } else if (rewardDebitUnits < 0) {
-      await tx.update(users).set({ bonusBalance: sql`${users.bonusBalance} + ${Math.abs(rewardDebitUnits)}` }).where(eq(users.openId, ownerOpenId));
-    }
+    const debit = await tx.update(users).set({
+      bonusBalance: sql`${users.bonusBalance} - ${bonusDebit}`,
+      ...(mainDebit > 0 ? { mainBalanceTon: sql`${users.mainBalanceTon} - ${mainDebit}` } : {}),
+    }).where(and(
+      eq(users.openId, ownerOpenId),
+      gte(users.bonusBalance, bonusDebit),
+      ...(mainDebit > 0 ? [gte(users.mainBalanceTon, mainDebit.toString())] : [])
+    ));
+    if (!debit[0]?.affectedRows) throw new Error("Недостаточно средств на балансе");
     if (totalCost) {
       await tx.insert(creditTransactions).values(groupsNeedingListing.map(group => ({ userOpenId: ownerOpenId, groupId: group.id, amount: -cost, kind: "listing_spend" as const })));
     } else {

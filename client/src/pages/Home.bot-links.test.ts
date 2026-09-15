@@ -44,7 +44,8 @@ describe("TG TOP production bot links", () => {
     const topCard = readFileSync(new URL("../components/TopRankingCard.tsx", import.meta.url), "utf8");
     const artwork = readFileSync(new URL("../components/CommunityArtwork.tsx", import.meta.url), "utf8");
     const compactRow = readFileSync(new URL("../components/CompactCommunityRow.tsx", import.meta.url), "utf8");
-    const source = `${home}\n${topCard}\n${artwork}\n${compactRow}`;
+    const giveawayCreate = readFileSync(new URL("../components/giveaways/GiveawayCreateSheet.tsx", import.meta.url), "utf8");
+    const source = `${home}\n${topCard}\n${artwork}\n${compactRow}\n${giveawayCreate}`;
     const styles = readFileSync(new URL("../index.css", import.meta.url), "utf8");
     const chartPanelsSource = readFileSync(new URL("../components/analytics/ChartPanels.tsx", import.meta.url), "utf8");
 
@@ -66,7 +67,7 @@ describe("TG TOP production bot links", () => {
     expect(source).toContain('В TG TOP пока нет площадок');
     expect(source).toContain('getTelegramAvatarSrc(group)');
     expect(source).toContain('className="absolute inset-0 grid place-items-center"');
-    expect(source).toContain('className="absolute inset-0 h-full w-full object-cover"');
+    expect(source).toContain('absolute inset-0 h-full w-full object-cover');
     expect(source).toContain('https://t.me/${group.username}');
     expect(source).toContain('onOpenCommunity(groupUrl)');
     expect(source).toContain('className="no-underline hover:text-white"');

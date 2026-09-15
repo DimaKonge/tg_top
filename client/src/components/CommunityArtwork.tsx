@@ -18,8 +18,9 @@ export function useGroupAvatarInfo(group?: CommunityArtworkGroup | null) {
   const candidates = useMemo(() => {
     const list: string[] = [];
     if (!group) return list;
-    if (group.chatId) {
-      list.push(`/api/telegram-avatar/${group.chatId}`);
+    const baseSrc = getTelegramAvatarSrc(group);
+    if (baseSrc) {
+      list.push(baseSrc);
     }
     if (group.avatarFileId && group.chatId) {
       list.push(`/api/telegram-avatar/${group.chatId}?v=${group.avatarFileId}`);
