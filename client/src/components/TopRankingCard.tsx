@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Plus, Star } from "lucide-react";
 import { formatCatalogNumber } from "@/lib/catalog-format";
 import { TgTopAnimatedPyramidAvatar } from "@/components/TgTopAnimatedPyramidAvatar";
@@ -7,6 +7,8 @@ import { getCommunityCardBackgroundStyle } from "@/lib/community-card-background
 export type TopRankingCardVariant = "lead" | "secondary" | "compact";
 
 export type TopRankingCardGroup = {
+  chatId?: string;
+  isNsfw?: boolean;
   title: string;
   username: string | null;
   inviteLink: string | null;
@@ -35,9 +37,33 @@ type TopRankingCardProps = {
  * Presentation-only TOP card. It is deliberately limited to the upper 1+2+4
  * ranking grid: catalog rows keep their lightweight list renderer in Home.
  */
-export function TopRankingCard({ group, variant, language, avatarSrc, showTgTopPyramidAvatar = false, onClick, onOpenCommunity }: TopRankingCardProps) {
+export function useRankingAvatarInfo(group?: TopRankingCardGroup | null, initialAvatarSrc?: string | null) {
+  const [candidateIndex, setCandidateIndex] = useState(0);
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  const candidates = useMemo(() => {
+    const list: string[] = [];
+    if (initialAvatarSrc) list.push(initialAvatarSrc);
+    if (!group) return list;
+    if (group.chatId) {
+      list.push(`/api/telegram-avatar/${group.chatId}`);
+    }
+    if (group.avatarFileId && group.chatId) {
+      list.push(`/api/telegram-avatar/${group.chatId}?v=${group.avatarFileId}`);
+    }
+    if (group.username) {
+      list.push(`https://t.me/i/userpic/320/${encodeURIComponent(group.username.replace(/^@/, "").trim())}.jpg`);
+    }
+    return list;
+  }, [group?.chatId, group?.username, group?.avatarFileId, initialAvatarSrc]);
+
+  return { candidates, candidateIndex, setCandidateIndex, imageLoaded, setImageLoaded };
+}
+
+export function TopRankingCard({ group, variant, language, avatarSrc: initialAvatarSrc, showTgTopPyramidAvatar = false, onClick, onOpenCommunity }: TopRankingCardProps) {
   const [videoFailed, setVideoFailed] = useState(false);
-  const [imageFailed, setImageFailed] = useState(false);
+  const { candidates, candidateIndex, setCandidateIndex, imageLoaded, setImageLoaded } = useRankingAvatarInfo(group, initialAvatarSrc);
+  const avatarSrc = candidates[candidateIndex] || null;
   const lead = variant === "lead";
   const compact = variant === "compact";
   const cardStyle = lead
@@ -76,8 +102,8 @@ export function TopRankingCard({ group, variant, language, avatarSrc, showTgTopP
             </span>
           ) : group.animatedAvatarUrl && !videoFailed ? (
             <video key={group.animatedAvatarUrl} src={group.animatedAvatarUrl} poster={avatarSrc ?? undefined} muted loop autoPlay playsInline preload="metadata" disablePictureInPicture className="pointer-events-none absolute inset-0 h-full w-full object-cover" onLoadedData={event => { void event.currentTarget.play().catch(() => undefined); }} onError={() => setVideoFailed(true)} />
-          ) : avatarSrc && !imageFailed ? (
-            <img src={avatarSrc} alt="" className="absolute inset-0 h-full w-full object-cover" onError={() => setImageFailed(true)} />
+          ) : avatarSrc ? (
+            <img src={avatarSrc} alt="" className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${imageLoaded ? "opacity-100" : "opacity-0"}`} onLoad={() => setImageLoaded(true)} onError={() => setCandidateIndex(prev => prev + 1)} />
           ) : (
             <span className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_35%_22%,#254e7a_0%,#111720_70%)] p-[24%]"><TgTopAnimatedPyramidAvatar className="h-full w-full" title="TG TOP" /></span>
           )}

@@ -818,7 +818,7 @@ export async function quoteTonWithdrawal(input: { amountTon: string; destination
 }
 
 export async function createTonWithdrawal(input: { userOpenId: string; amountTon: string; destinationWalletAddress: string; idempotencyKey: string }) {
-  // if (!isTonWithdrawalAutomationEnabled()) throw new Error("Вывод временно приостановлен до завершения проверки защищённой очереди");
+  if (!isTonWithdrawalAutomationEnabled()) throw new Error("Вывод временно приостановлен до завершения проверки защищённой очереди");
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const quote = getTonWithdrawalQuote(input.amountTon);
@@ -947,7 +947,7 @@ export async function reconcileTonWithdrawal(input: { withdrawalId: number; user
 export async function reviewTonWithdrawal(input: { withdrawalId: number; reviewerOpenId: string; action: "approve" | "reject"; reason?: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  if (false) {
+  if (input.action === "approve" && !isTonWithdrawalAutomationEnabled()) {
     throw new Error("Вывод временно приостановлен до включения проверенной payout-очереди");
   }
   let result: typeof tonWithdrawals.$inferSelect | undefined;
@@ -1321,18 +1321,8 @@ export async function getAuctionSlots(category?: string, country?: string, subca
     eq(auctionSlots.subcategory, boardSubcategory),
     eq(auctionSlots.country, boardCountry)
   )).orderBy(asc(auctionSlots.slotNumber));
-  const uniqueUserIds = new Set<string>();
-  const slotsWithUniqueGroups = slots.map(slot => {
-     if (slot.groupId === null || slot.leaderUserId === null) return slot;
-     if (uniqueUserIds.has(slot.leaderUserId)) {
-        return { ...slot, groupId: null, leaderUserId: null, leaderUsername: "-", currentBid: "0 GRAM", bidAmount: 0 };
-     }
-     uniqueUserIds.add(slot.leaderUserId);
-     return slot;
-  });
-
-  const groupIds = slotsWithUniqueGroups.map(slot => slot.groupId).filter((id): id is number => id !== null);
-  if (groupIds.length === 0) return slotsWithUniqueGroups.map(slot => ({ ...slot, isOccupied: false, group: null }));
+  const groupIds = slots.map(slot => slot.groupId).filter((id): id is number => id !== null);
+  if (groupIds.length === 0) return slots.map(slot => ({ ...slot, isOccupied: false, group: null }));
   const groupConditions = [inArray(groupsCatalog.id, groupIds)];
   if (requestedCategory !== "Все") groupConditions.push(eq(groupsCatalog.category, requestedCategory));
   if (country && country !== "Все" && country !== "Global") groupConditions.push(eq(groupsCatalog.country, country));
@@ -1362,7 +1352,7 @@ export async function getAuctionSlots(category?: string, country?: string, subca
     },
   ];
   }));
-  return slotsWithUniqueGroups.map(slot => {
+  return slots.map(slot => {
     const isOccupied = slot.groupId !== null;
     const group = slot.groupId ? groupMap.get(slot.groupId) ?? null : null;
     return group
@@ -1500,31 +1490,25 @@ export async function placeBid(slotId: number, bidAmount: number, currentBidStr:
         }
       : undefined;
     if (creditDebit) {
-      const totalDebit = creditDebit.spendUnits + creditDebit.reservedRewardBudget - creditDebit.releasedRewardBudget;
-      const user = (await tx.select({ bonusBalance: users.bonusBalance, mainBalanceTon: users.mainBalanceTon }).from(users).where(eq(users.openId, leaderUserId)).limit(1))[0];
-      if (!user) throw new Error("Пользователь не найден");
-      
-      let bonusDebit = 0;
-      let mainDebit = 0;
-      if (totalDebit > 0) {
-        bonusDebit = Math.min(user.bonusBalance, totalDebit);
-        const mainDebitUnits = totalDebit - bonusDebit;
-        if (mainDebitUnits > 0) {
-           mainDebit = mainDebitUnits / 100;
-           if (Number(user.mainBalanceTon) < mainDebit) {
-              throw new Error(`Недостаточно GRAM на балансе. Нужно ${formatTonAmount(Math.max(0, totalDebit) / 100)} GRAM`);
-           }
+      const spendTon = creditDebit.spendUnits / 100;
+      if (spendTon > 0) {
+        const balanceTon = await tx.update(users).set({ mainBalanceTon: sql`${users.mainBalanceTon} - ${spendTon}` }).where(and(eq(users.openId, leaderUserId), gte(users.mainBalanceTon, spendTon.toString())));
+        if (Number(balanceTon[0]?.affectedRows ?? 0) !== 1) {
+          throw new Error(`Недостаточно TON на балансе. Нужно ${spendTon} TON`);
         }
-      } else if (totalDebit < 0) {
-         bonusDebit = totalDebit;
+        await tx.insert(creditTransactions).values({ userOpenId: leaderUserId, groupId: groupId ?? null, amount: -creditDebit.spendUnits, kind: "ranking_spend" });
       }
-      
-      await tx.update(users).set({
-        bonusBalance: sql`${users.bonusBalance} - ${bonusDebit}`,
-        ...(mainDebit > 0 ? { mainBalanceTon: sql`${users.mainBalanceTon} - ${mainDebit}` } : {})
-      }).where(eq(users.openId, leaderUserId));
 
-      if (creditDebit.spendUnits) await tx.insert(creditTransactions).values({ userOpenId: leaderUserId, groupId: groupId ?? null, amount: -creditDebit.spendUnits, kind: "ranking_spend" });
+      const rewardDebitUnits = creditDebit.reservedRewardBudget - creditDebit.releasedRewardBudget;
+      if (rewardDebitUnits > 0) {
+        const balanceBonus = await tx.update(users).set({ bonusBalance: sql`${users.bonusBalance} - ${rewardDebitUnits}` }).where(and(eq(users.openId, leaderUserId), gte(users.bonusBalance, rewardDebitUnits)));
+        if (Number(balanceBonus[0]?.affectedRows ?? 0) !== 1) {
+          throw new Error(`Недостаточно бонусных GRAM на балансе. Нужно ${rewardDebitUnits / 100} GRAM`);
+        }
+      } else if (rewardDebitUnits < 0) {
+        await tx.update(users).set({ bonusBalance: sql`${users.bonusBalance} + ${Math.abs(rewardDebitUnits)}` }).where(eq(users.openId, leaderUserId));
+      }
+
       if (creditDebit.reservedRewardBudget) await tx.insert(creditTransactions).values({ userOpenId: leaderUserId, groupId: groupId ?? null, amount: -creditDebit.reservedRewardBudget, kind: "reward_campaign_reserve" });
       if (creditDebit.releasedRewardBudget) await tx.insert(creditTransactions).values({ userOpenId: leaderUserId, groupId: groupId ?? null, amount: creditDebit.releasedRewardBudget, kind: "reward_campaign_release" });
     }
@@ -1541,7 +1525,7 @@ export async function placeBid(slotId: number, bidAmount: number, currentBidStr:
     };
     for (const board of boards) {
       const strictOrder = assignRankingEntriesToSlots([
-        ...board.filter(slot => slot.groupId !== null && slot.leaderUserId !== leaderUserId).map(slot => ({ ...slot, heldSince: slot.updatedAt })),
+        ...board.filter(slot => slot.groupId !== null && slot.groupId !== groupId).map(slot => ({ ...slot, heldSince: slot.updatedAt })),
         incoming,
       ], board);
 
@@ -1753,7 +1737,7 @@ export async function getPublicOwnerProfile(openId: string) {
   const groups = await db.select().from(groupsCatalog).where(and(
     eq(groupsCatalog.ownerOpenId, openId),
     eq(groupsCatalog.status, "listed")
-  )).orderBy(asc(groupsCatalog.listedAt), asc(groupsCatalog.createdAt));
+  )).orderBy(desc(groupsCatalog.listedAt), desc(groupsCatalog.createdAt));
   if (!groups.length) return undefined;
   const [owner] = await db.select({
     openId: users.openId,
@@ -2930,30 +2914,27 @@ export async function listGroupsWithCredits(ownerOpenId: string, groupIds: numbe
   const totalCost = groupsNeedingListing.length * cost;
   const reservedRewardBudget = rewardConfig && rewardGroup ? Math.max(0, rewardConfig.rewardBudget - rewardGroup.rewardBudget) : 0;
   const releasedRewardBudget = rewardConfig && rewardGroup ? Math.max(0, rewardGroup.rewardBudget - rewardConfig.rewardBudget) : 0;
-  const debitUnits = totalCost + reservedRewardBudget - releasedRewardBudget;
-  await db.transaction(async tx => {
-    const user = (await tx.select({ bonusBalance: users.bonusBalance, mainBalanceTon: users.mainBalanceTon }).from(users).where(eq(users.openId, ownerOpenId)).limit(1))[0];
-    if (!user) throw new Error("Пользователь не найден");
+  const totalCostTon = totalCost / 100;
+  const rewardDebitUnits = reservedRewardBudget - releasedRewardBudget;
 
-    let bonusDebit = 0;
-    let mainDebit = 0;
-    if (debitUnits > 0) {
-      bonusDebit = Math.min(user.bonusBalance, debitUnits);
-      const mainDebitUnits = debitUnits - bonusDebit;
-      if (mainDebitUnits > 0) {
-         mainDebit = mainDebitUnits / 100;
-         if (Number(user.mainBalanceTon) < mainDebit) {
-            throw new Error(`Недостаточно GRAM на балансе. Нужно ${formatTonAmount(debitUnits / 100)} GRAM`);
-         }
-      }
-    } else if (debitUnits < 0) {
-      bonusDebit = debitUnits;
+  await db.transaction(async tx => {
+    if (totalCostTon > 0) {
+      const debitTon = await tx.update(users).set({ mainBalanceTon: sql`${users.mainBalanceTon} - ${totalCostTon}` }).where(and(
+        eq(users.openId, ownerOpenId),
+        gte(users.mainBalanceTon, totalCostTon.toString()),
+      ));
+      if (!debitTon[0]?.affectedRows) throw new Error("Недостаточно TON на балансе");
     }
 
-    await tx.update(users).set({
-      bonusBalance: sql`${users.bonusBalance} - ${bonusDebit}`,
-      ...(mainDebit > 0 ? { mainBalanceTon: sql`${users.mainBalanceTon} - ${mainDebit}` } : {})
-    }).where(eq(users.openId, ownerOpenId));
+    if (rewardDebitUnits > 0) {
+      const debitBonus = await tx.update(users).set({ bonusBalance: sql`${users.bonusBalance} - ${rewardDebitUnits}` }).where(and(
+        eq(users.openId, ownerOpenId),
+        gte(users.bonusBalance, rewardDebitUnits),
+      ));
+      if (!debitBonus[0]?.affectedRows) throw new Error("Недостаточно бонусных GRAM");
+    } else if (rewardDebitUnits < 0) {
+      await tx.update(users).set({ bonusBalance: sql`${users.bonusBalance} + ${Math.abs(rewardDebitUnits)}` }).where(eq(users.openId, ownerOpenId));
+    }
     if (totalCost) {
       await tx.insert(creditTransactions).values(groupsNeedingListing.map(group => ({ userOpenId: ownerOpenId, groupId: group.id, amount: -cost, kind: "listing_spend" as const })));
     } else {
@@ -3168,7 +3149,7 @@ export async function unlistGroups(ownerOpenId: string, groupIds: number[]) {
       eq(auctionSlots.country, "Global")
     )).orderBy(asc(auctionSlots.slotNumber));
     const listedCandidates = await tx.select().from(groupsCatalog).where(eq(groupsCatalog.status, "listed"))
-      .orderBy(asc(groupsCatalog.listedAt), asc(groupsCatalog.createdAt));
+      .orderBy(desc(groupsCatalog.listedAt), desc(groupsCatalog.createdAt));
     const assignments = planVacantRankingAssignments(board, listedCandidates.map(group => group.id));
     const candidatesById = new Map(listedCandidates.map(group => [group.id, group]));
     for (const assignment of assignments) {

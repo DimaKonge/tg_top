@@ -325,6 +325,7 @@ export const groupsCatalog = mysqlTable("groups_catalog", {
   country: varchar("country", { length: 64 }).default("Global").notNull(),
   city: varchar("city", { length: 96 }),
   status: mysqlEnum("status", ["listed", "rented", "sold", "pending", "review", "blocked"]).default("listed").notNull(),
+  isNsfw: boolean("isNsfw").default(false).notNull(),
   moderationStatus: mysqlEnum("moderationStatus", ["pending", "approved", "review", "blocked"]).default("pending").notNull(),
   moderationReason: varchar("moderationReason", { length: 255 }),
   moderationReviewedBy: varchar("moderationReviewedBy", { length: 64 }),

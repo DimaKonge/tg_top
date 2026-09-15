@@ -68,7 +68,7 @@ export function classifyTonWithdrawalRisk(snapshot: TonWithdrawalRiskSnapshot, q
   if (snapshot.lastUserRequestAtMs !== null && snapshot.nowMs - snapshot.lastUserRequestAtMs < TON_WITHDRAWAL_USER_COOLDOWN_MS) reasons.push("user_cooldown");
   if (snapshot.lastAddressRequestAtMs !== null && snapshot.nowMs - snapshot.lastAddressRequestAtMs < TON_WITHDRAWAL_ADDRESS_COOLDOWN_MS) reasons.push("address_cooldown");
   if (snapshot.globalRequestsLastMinute >= TON_WITHDRAWAL_GLOBAL_MAX_PER_MINUTE) reasons.push("global_velocity");
-  // if (snapshot.emergencyPaused) throw new Error("Автоматический вывод временно приостановлен");
+  if (snapshot.emergencyPaused) throw new Error("Автоматический вывод временно приостановлен");
   return { status: reasons.length > 0 ? "manual_review" : "queued", reasons };
 }
 

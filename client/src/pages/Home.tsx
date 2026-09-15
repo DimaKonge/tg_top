@@ -2222,6 +2222,13 @@ export default function Home({ onReady }: { onReady?: () => void }) {
   const activeRankingBoardScope = { category, country: country === "Все" ? "Global" : country, subcategory, city };
 
   const openGroup = (id: number, boardScope?: { category: "Все" | "Каналы" | "Чаты"; country: string; subcategory: string; city: string }) => {
+    const group = visibleGroups.find(g => g.id === id) || slots.find(s => s.group?.id === id)?.group;
+    if ((group as any)?.isNsfw) {
+      if (!window.confirm(language === "en" ? "This community contains 18+ content. Are you over 18 years old and consent to view this?" : "Это сообщество содержит контент 18+. Вам есть 18 лет и вы согласны на просмотр?")) {
+        return;
+      }
+    }
+
     setDetailReturnPage(page === "details" ? "top" : page);
     const displayPosition = boardScope ? rankedGroups.findIndex(group => group.id === id) + 1 : 0;
     setDetailBoardScope(boardScope ? { ...boardScope, ...(displayPosition > 0 ? { displayPosition } : {}) } : null);
