@@ -23,6 +23,7 @@ import { TgTopPyramidIcon } from "@/components/TgTopPyramidIcon";
 import { TopRankingCard } from "@/components/TopRankingCard";
 import { CommunityAvatar as Avatar, FullBleedCommunityArtwork as FullBleedGroupArtwork, getTelegramAvatarSrc } from "@/components/CommunityArtwork";
 import { CompactCommunityRow } from "@/components/CompactCommunityRow";
+import { getCommunityCardBackgroundStyle } from "@/lib/community-card-background";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Sheet,
@@ -3698,7 +3699,10 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                   <span className="shrink-0 text-[10px] text-slate-600">·</span>
                   <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-slate-500">{detailHeaderPath}</span>
                 </button>
-                <div className="relative flex flex-col overflow-hidden rounded-[22px] border border-[#31435f] bg-[#17212b] p-3">
+                <div
+                  style={getCommunityCardBackgroundStyle(detail.group.cardBackgroundPreset)}
+                  className="tg-community-card relative flex flex-col overflow-hidden rounded-[22px] border border-[#31435f] bg-[#17212b] p-3 transition-[background-color,border-color] duration-200"
+                >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-1.5">
                       {detailDisplayedSlotNumber ? (
@@ -5009,7 +5013,10 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                   : { text: "text-fuchsia-300", range: "[&_[data-slot=slider-range]]:!bg-fuchsia-400 [&_[data-slot=slider-thumb]]:!border-fuchsia-100 [&_[data-slot=slider-thumb]]:!bg-fuchsia-400" };
               const setBid = (next: number) => setAmount(formatTon(Math.min(MAX_RANKING_BID_GRAM, Math.max(minimum, Math.round(next * 10) / 10))));
               return <div className="flex flex-col gap-3">
-                <div className="order-1 flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.035] p-3">
+                <div
+                  style={getCommunityCardBackgroundStyle(starsPaymentGroup.cardBackgroundPreset ?? listingCardBackgroundPreset)}
+                  className="tg-community-card order-1 flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.035] p-3 transition-[background-color,border-color] duration-200"
+                >
                   <Avatar group={starsPaymentGroup} compact />
                   <span className="min-w-0 flex-1"><b className="block truncate text-sm text-white">{starsPaymentGroup.title}</b><small className="mt-0.5 block text-[11px] text-slate-500">{tx(`Минимум для позиции: ${formatTon(minimum)} GRAM`, `Placement minimum: ${formatTon(minimum)} GRAM`)}</small></span>
                 </div>
