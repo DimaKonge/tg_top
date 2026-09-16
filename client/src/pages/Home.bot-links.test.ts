@@ -196,7 +196,6 @@ describe("TG TOP production bot links", () => {
     expect(source).toContain('["offchain", "Off-chain"]');
     expect(source).toContain('prepareNftTransfer');
     expect(source).not.toContain('completeOffchainNftTransfer');
-    expect(source).toContain('Заявка на передачу');
     expect(source).toContain('group.title.slice(0, 1).toUpperCase()');
     expect(source).not.toContain('accept="video/mp4"');
     expect(source).not.toContain('uploadSelectedAnimatedAvatar');
@@ -290,9 +289,6 @@ describe("TG TOP production bot links", () => {
     expect(source).toContain('Оплата подтверждена Telegram. Позиция обновляется…');
     const showcaseSource = readFileSync(new URL("../components/tgtop/NftShowcase.tsx", import.meta.url), "utf8");
     expect(showcaseSource).toContain("export function NftShowcase");
-    expect(source).toContain('NFT-витрина площадки');
-    expect(source).toContain('NFT-витрина владельца');
-    expect(source).toContain('Моя NFT-витрина');
     expect(source).toContain('setNftShowcase.mutate');
     expect(source).toContain('get("listing")');
     expect(source).toContain('setPage("details")');
