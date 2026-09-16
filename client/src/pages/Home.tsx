@@ -3970,7 +3970,12 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                           </button>
                         </div>
                       ) : (
-                        <button type="button" onClick={() => setLotGroupPickerOpen(true)} className="mt-2 flex w-full items-center gap-2 rounded-xl border border-[#3390ec]/55 bg-[#213750] p-2 text-left transition-colors hover:bg-[#274363]">
+                        <button
+                          type="button"
+                          onClick={() => setLotGroupPickerOpen(true)}
+                          style={getCommunityCardBackgroundStyle(selectedLotGroup.cardBackgroundPreset ?? listingCardBackgroundPreset)}
+                          className="tg-community-card mt-2 flex w-full items-center gap-2 rounded-xl border border-[#3390ec]/55 bg-[#213750] p-2 text-left transition-colors hover:bg-[#274363]"
+                        >
                           <Avatar group={selectedLotGroup} compact />
                           <span className="min-w-0 flex-1"><small className="block text-[9px] uppercase tracking-wide text-[#8fc4ff]">Выбрана ваша группа</small><b className="block truncate text-xs text-slate-100">{selectedLotGroup.title}</b></span>
                           <span className="text-[10px] font-semibold text-[#8fc4ff]">Изменить</span>
