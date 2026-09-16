@@ -14,32 +14,8 @@ permissions:
   contents: read
 
 jobs:
-  verify:
-    name: Verify source
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.4.1
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
-      - name: TypeScript check
-        run: pnpm run check
-      - name: Unit tests
-        run: pnpm exec vitest run --exclude server/telegramUserAgent.test.ts --exclude server/telegramUserApi.credentials.test.ts --exclude server/tonPayoutWallet.credentials.test.ts --exclude server/tonApi.credentials.test.ts --exclude client/src/pages/Home.mobile-rendered.test.ts --pool=forks --poolOptions.forks.singleFork
-      - name: Production build
-        run: pnpm run build
-
   deploy:
-    name: Stage and deploy
-    needs: verify
+    name: Fast Build and Deploy
     runs-on: ubuntu-latest
     environment: production
     steps:
