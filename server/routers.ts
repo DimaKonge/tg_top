@@ -17,6 +17,7 @@ import { telegramUserAgentRouter } from "./routers/telegramUserAgentRouter";
 import { financeProcedures } from "./routers/financeRouter";
 import { supportRouter } from "./routers/supportRouter";
 import * as auctionService from "./modules/auction";
+import * as catalogService from "./modules/catalog";
 import { getTelegramIdFromOpenId } from "./onboardingIntentPolicy";
 import { canRefreshGroupMediaSnapshot, shouldUpdateAnimatedAvatarSnapshot } from "./groupMediaSnapshotPolicy";
 import { CARD_BACKGROUND_PRESET_IDS, type CardBackgroundPreset } from "../shared/card-background-presets";
@@ -183,11 +184,11 @@ export const appRouter = router({
     getGroups: publicProcedure
       .input(z.object({ category: z.string().optional(), country: z.string().optional(), subcategory: z.string().optional(), city: z.string().optional() }).optional())
       .query(async ({ input }) => {
-        return await db.getGroupsCatalog(input?.category, input?.country, input?.subcategory, input?.city);
+        return await catalogService.getGroupsCatalog(input?.category, input?.country, input?.subcategory, input?.city);
       }),
 
     myGroups: protectedProcedure.query(async ({ ctx }) => {
-      return await db.getMyGroups(ctx.user.openId);
+      return await catalogService.getMyGroups(ctx.user.openId);
     }),
     refreshMyGroupMedia: protectedProcedure
       .input(z.object({ groupId: z.number().int().positive(), forceListedRefresh: z.boolean().default(false) }))
@@ -263,14 +264,14 @@ export const appRouter = router({
         pinnedGroupIds: z.array(z.number().int().positive()).max(100),
       }))
       .mutation(async ({ ctx, input }) => {
-        await db.saveMyGroupsLayout(ctx.user.openId, input.orderedGroupIds, input.pinnedGroupIds);
+        await catalogService.saveMyGroupsLayout(ctx.user.openId, input.orderedGroupIds, input.pinnedGroupIds);
         return { success: true } as const;
       }),
 
     getGroupDetail: publicProcedure
       .input(z.object({ groupId: z.number() }))
       .query(async ({ ctx, input }) => {
-        return await db.getGroupDetail(input.groupId, ctx.user?.openId);
+        return await catalogService.getGroupDetail(input.groupId, ctx.user?.openId);
       }),
 
     getChannelGifts: protectedProcedure
@@ -318,61 +319,61 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => db.creditBonusByTelegramUsername(ctx.user.openId, input.telegramUsername, input.amount, input.reason)),
 
     getCatalogTaxonomy: publicProcedure.query(async () => {
-      return await db.getCatalogTaxonomy();
+      return await catalogService.getCatalogTaxonomy();
     }),
 
     getApprovedBots: publicProcedure
       .input(z.object({ category: z.string().trim().max(64).optional() }).optional())
       .query(async ({ input }) => {
-        return await db.getApprovedBotListings(input?.category);
+        return await catalogService.getApprovedBotListings(input?.category);
       }),
 
     myBotListings: protectedProcedure.query(async ({ ctx }) => {
-      return await db.getMyBotListings(ctx.user.openId);
+      return await catalogService.getMyBotListings(ctx.user.openId);
     }),
 
     submitBotListing: protectedProcedure
       .input(z.object({ telegramLink: z.string().trim().min(3).max(512) }))
       .mutation(async ({ ctx, input }) => {
-        return await db.submitBotListing(ctx.user.openId, input.telegramLink);
+        return await catalogService.submitBotListing(ctx.user.openId, input.telegramLink);
       }),
 
     addCatalogCountry: protectedProcedure
       .input(z.object({ code: catalogCode.max(64), label: z.string().trim().min(2).max(96) }))
       .mutation(async ({ ctx, input }) => {
-        return await db.addCatalogCountry(ctx.user.openId, input);
+        return await catalogService.addCatalogCountry(ctx.user.openId, input);
       }),
 
     deleteCatalogCountry: protectedProcedure
       .input(z.object({ countryCode: catalogCode.max(64) }))
       .mutation(async ({ ctx, input }) => {
-        await db.deleteCatalogCountry(ctx.user.openId, input.countryCode);
+        await catalogService.deleteCatalogCountry(ctx.user.openId, input.countryCode);
         return { success: true } as const;
       }),
 
     addCatalogCity: protectedProcedure
       .input(z.object({ countryCode: catalogCode.max(64), code: catalogCode, label: z.string().trim().min(2).max(128) }))
       .mutation(async ({ ctx, input }) => {
-        return await db.addCatalogCity(ctx.user.openId, input);
+        return await catalogService.addCatalogCity(ctx.user.openId, input);
       }),
 
     deleteCatalogCity: protectedProcedure
       .input(z.object({ cityId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
-        await db.deleteCatalogCity(ctx.user.openId, input.cityId);
+        await catalogService.deleteCatalogCity(ctx.user.openId, input.cityId);
         return { success: true } as const;
       }),
 
     addCatalogTopic: protectedProcedure
       .input(z.object({ category: z.enum(["Каналы", "Чаты", "Боты"]), code: catalogCode.max(64), label: z.string().trim().min(2).max(96) }))
       .mutation(async ({ ctx, input }) => {
-        return await db.addCatalogTopic(ctx.user.openId, input);
+        return await catalogService.addCatalogTopic(ctx.user.openId, input);
       }),
 
     deleteCatalogTopic: protectedProcedure
       .input(z.object({ topicId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
-        await db.deleteCatalogTopic(ctx.user.openId, input.topicId);
+        await catalogService.deleteCatalogTopic(ctx.user.openId, input.topicId);
         return { success: true } as const;
       }),
 
@@ -385,13 +386,13 @@ export const appRouter = router({
     getBotModerationQueue: protectedProcedure.query(async ({ ctx }) => {
       const access = await db.getModerationAccess(ctx.user.openId);
       if (!access.canModerate) throw new Error("Недостаточно прав для просмотра заявок ботов");
-      return await db.getBotModerationQueue();
+      return await catalogService.getBotModerationQueue();
     }),
 
     getAllBotListings: protectedProcedure.query(async ({ ctx }) => {
       const access = await db.getModerationAccess(ctx.user.openId);
       if (!access.canModerate) throw new Error("Недостаточно прав для просмотра каталога ботов");
-      return await db.getAllBotListings();
+      return await catalogService.getAllBotListings();
     }),
 
     deleteBotListing: protectedProcedure
@@ -399,7 +400,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const access = await db.getModerationAccess(ctx.user.openId);
         if (!access.canModerate) throw new Error("Недостаточно прав для удаления ботов");
-        return await db.deleteBotListing(ctx.user.openId, input.botListingId);
+        return await catalogService.deleteBotListing(ctx.user.openId, input.botListingId);
       }),
 
     moderateBotListing: protectedProcedure
@@ -415,7 +416,7 @@ export const appRouter = router({
         if (input.action === "reject" && (!input.reason || input.reason.length < 3)) {
           throw new Error("Укажите причину отклонения заявки на бота");
         }
-        return await db.moderateBotListing({ reviewerOpenId: ctx.user.openId, ...input });
+        return await catalogService.moderateBotListing({ reviewerOpenId: ctx.user.openId, ...input });
       }),
 
     getActiveModerationListings: protectedProcedure.query(async ({ ctx }) => {
