@@ -4,21 +4,18 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
-import { createStarsRankingInvoiceLink, createTelegramMonthlySubscriptionInviteLink, createTelegramPrivateInviteLink, createTelegramRewardInviteLink, notifyCommunityListed, notifyCommunityRemovedFromTop, notifyRecordedRankingBid } from "./telegramNotifications";
-import { getTelegramChatGifts, getTelegramGroupAdministrators, getTelegramUserAvatarUrl, resolveVerifiedGroupEntryLink } from "./telegramBot";
-import { fetchTelegramGroupProfileMedia } from "./telegramUserAgent";
+import * as auctionService from "./modules/auction";
+import * as catalogService from "./modules/catalog";
+import * as moderationService from "./modules/moderation";
+import * as telegramService from "./modules/telegram";
 import { formatTonAmount } from "./tonFormatting";
 import { getWalletNfts } from "./tonNft";
 import { canCreateNftListing } from "./nftOwnershipPublicationPolicy";
-import { deliverOperationsLog, formatTopActivityLog } from "./telegramOperationsLogger";
 import { canResolveVerifiedEntryLink } from "./entryLinkAccess";
 import { countSuccessfulTelegramAnnouncements } from "./listingAnnouncementPolicy";
 import { telegramUserAgentRouter } from "./routers/telegramUserAgentRouter";
 import { financeProcedures } from "./routers/financeRouter";
 import { supportRouter } from "./routers/supportRouter";
-import * as auctionService from "./modules/auction";
-import * as catalogService from "./modules/catalog";
-import * as moderationService from "./modules/moderation";
 import { getTelegramIdFromOpenId } from "./onboardingIntentPolicy";
 import { canRefreshGroupMediaSnapshot, shouldUpdateAnimatedAvatarSnapshot } from "./groupMediaSnapshotPolicy";
 import { CARD_BACKGROUND_PRESET_IDS, type CardBackgroundPreset } from "../shared/card-background-presets";
@@ -30,7 +27,7 @@ const MEDIA_REFRESH_COOLDOWN_MS = 10 * 60_000;
 
 async function refreshListedGroupMediaSnapshot(group: { id: number; chatId: string }) {
   try {
-    const result = await fetchTelegramGroupProfileMedia(group.chatId, group.id);
+    const result = await telegramService.fetchTelegramGroupProfileMedia(group.chatId, group.id);
     if (!shouldUpdateAnimatedAvatarSnapshot(result.mediaType, result.reason)) return;
     await db.updateGroupAnimatedAvatarSnapshot(group.id, {
       animatedAvatarKey: result.animatedAvatarKey,
@@ -148,13 +145,13 @@ export const appRouter = router({
                 rewardPerManualAdd: input.rewardPerManualAdd,
               }
         );
-        void notifyRecordedRankingBid({
+        void telegramService.notifyRecordedRankingBid({
           openId: ctx.user.openId,
           groupTitle: intent.groupTitle,
           bidAmount: intent.bidAmount,
           slotNumber: intent.slotNumber,
         });
-        void deliverOperationsLog("top_activity", formatTopActivityLog({
+        void telegramService.deliverOperationsLog("top_activity", telegramService.formatTopActivityLog({
           event: "listed_in_top",
           groupTitle: intent.groupTitle,
           groupId: input.groupId,
@@ -205,7 +202,7 @@ export const appRouter = router({
           return { groupId: group.id, refreshed: false, skipped: "cooldown" as const };
         }
         mediaRefreshCooldowns.set(cooldownKey, Date.now());
-        const result = await fetchTelegramGroupProfileMedia(group.chatId, group.id);
+        const result = await telegramService.fetchTelegramGroupProfileMedia(group.chatId, group.id);
         if (!shouldUpdateAnimatedAvatarSnapshot(result.mediaType, result.reason)) return { ...result, refreshed: false };
         const saved = await db.updateGroupAnimatedAvatarSnapshot(group.id, {
           animatedAvatarKey: result.animatedAvatarKey,
@@ -219,7 +216,7 @@ export const appRouter = router({
         const group = await db.getGroupById(input.groupId);
         if (!group || group.ownerOpenId !== ctx.user.openId) throw new Error("Сообщество недоступно для настройки менеджера");
         try {
-          return await getTelegramGroupAdministrators(group.chatId);
+          return await telegramService.getTelegramGroupAdministrators(group.chatId);
         } catch {
           throw new Error("Не удалось получить администраторов. Добавьте @TG_TOPBOT в администраторы группы и повторите попытку.");
         }
@@ -231,13 +228,13 @@ export const appRouter = router({
         if (!group || group.ownerOpenId !== ctx.user.openId) throw new Error("Сообщество недоступно для настройки менеджера");
         let administrators;
         try {
-          administrators = await getTelegramGroupAdministrators(group.chatId);
+          administrators = await telegramService.getTelegramGroupAdministrators(group.chatId);
         } catch {
           throw new Error("Не удалось проверить администраторов. Убедитесь, что @TG_TOPBOT добавлен в администраторы группы.");
         }
         const manager = administrators.find(admin => admin.telegramUserId === input.telegramUserId);
         if (!manager) throw new Error("Выбранный аккаунт больше не является администратором этой группы");
-        const avatarUrl = manager.avatarUrl ?? await getTelegramUserAvatarUrl(manager.telegramUserId);
+        const avatarUrl = manager.avatarUrl ?? await telegramService.getTelegramUserAvatarUrl(manager.telegramUserId);
         const managerWithAvatar = { ...manager, avatarUrl };
         await db.setGroupManager(ctx.user.openId, group.id, managerWithAvatar);
         return { success: true, manager: managerWithAvatar };
@@ -281,7 +278,7 @@ export const appRouter = router({
         const group = await db.getGroupById(input.groupId);
         if (!group || group.ownerOpenId !== ctx.user.openId) throw new Error("Подарки доступны владельцу подключённого канала");
         try {
-          return await getTelegramChatGifts(group.chatId);
+          return await telegramService.getTelegramChatGifts(group.chatId);
         } catch {
           throw new Error("Telegram пока не дал доступ к подаркам канала. Проверьте, что @TG_TOPBOT — администратор с правом публикации сообщений.");
         }
@@ -437,7 +434,7 @@ export const appRouter = router({
         if (!access.canModerate) throw new Error("Недостаточно прав для модерации лотов");
         const group = await moderationService.moderateGroup(ctx.user.openId, input.groupId, input.action, input.reason);
         const ownerNotified = input.action !== "approve"
-          ? await notifyCommunityRemovedFromTop({ openId: group.ownerOpenId, groupTitle: group.title, reason: input.reason })
+          ? await telegramService.notifyCommunityRemovedFromTop({ openId: group.ownerOpenId, groupTitle: group.title, reason: input.reason })
           : false;
         return { success: true, ownerNotified } as const;
       }),
@@ -465,7 +462,7 @@ export const appRouter = router({
       .input(z.object({ groupId: z.number() }).merge(groupListingInput))
       .mutation(async ({ ctx, input }) => {
         const groups = await db.listGroupWithCredits(ctx.user.openId, input.groupId, input);
-        const deliveries = await Promise.all(groups.filter(group => group.listingAnnouncementEnabled).map(group => notifyCommunityListed({
+        const deliveries = await Promise.all(groups.filter(group => group.listingAnnouncementEnabled).map(group => telegramService.notifyCommunityListed({
           chatId: group.chatId,
           groupId: group.id,
           groupTitle: group.title,
@@ -480,7 +477,7 @@ export const appRouter = router({
       .input(z.object({ groupIds: z.array(z.number()).min(1).max(50) }).merge(groupListingInput))
       .mutation(async ({ ctx, input }) => {
         const groups = await db.listGroupsWithCredits(ctx.user.openId, input.groupIds, input);
-        const deliveries = await Promise.all(groups.filter(group => group.listingAnnouncementEnabled).map(group => notifyCommunityListed({
+        const deliveries = await Promise.all(groups.filter(group => group.listingAnnouncementEnabled).map(group => telegramService.notifyCommunityListed({
           chatId: group.chatId,
           groupId: group.id,
           groupTitle: group.title,
@@ -499,7 +496,7 @@ export const appRouter = router({
         if (group.category !== "Каналы" || group.username || !group.monthlyEntryEnabled || !group.monthlyEntryStars) {
           throw new Error("Ежемесячный вход доступен только для приватного канала с указанной ценой");
         }
-        const inviteLink = await createTelegramMonthlySubscriptionInviteLink({
+        const inviteLink = await telegramService.createTelegramMonthlySubscriptionInviteLink({
           chatId: group.chatId,
           starsAmount: group.monthlyEntryStars,
           linkName: group.monthlyEntryLinkName,
@@ -514,7 +511,7 @@ export const appRouter = router({
         const group = await db.getGroupById(input.groupId);
         if (!group || group.ownerOpenId !== ctx.user.openId) throw new Error("Сообщество недоступно для настройки");
         if (group.username) throw new Error("Закрытая ссылка доступна только для приватного сообщества без @username");
-        const inviteLink = await createTelegramPrivateInviteLink({ chatId: group.chatId, linkName: "TG TOP private entry" });
+        const inviteLink = await telegramService.createTelegramPrivateInviteLink({ chatId: group.chatId, linkName: "TG TOP private entry" });
         await db.savePrivateEntryInviteLink(ctx.user.openId, group.id, inviteLink);
         return { success: true, inviteLink };
       }),
@@ -528,7 +525,7 @@ export const appRouter = router({
         if (!canResolveVerifiedEntryLink({ target: group, viewerOpenId: ctx.user.openId, canModerate: access.canModerate })) {
           throw new Error("Закрытая ссылка доступна только владельцу сообщества или модератору");
         }
-        const entryUrl = await resolveVerifiedGroupEntryLink(group);
+        const entryUrl = await telegramService.resolveVerifiedGroupEntryLink(group);
         return { entryUrl };
       }),
 
@@ -538,7 +535,7 @@ export const appRouter = router({
         const group = await db.getGroupById(input.groupId);
         if (!group || group.ownerOpenId === ctx.user.openId) throw new Error("Ссылка для приглашений недоступна");
         const result = await db.getOrCreateRewardInviteLink(input.groupId, ctx.user.openId, () =>
-          createTelegramRewardInviteLink({
+          telegramService.createTelegramRewardInviteLink({
             chatId: group.chatId,
             linkName: `TG TOP reward ${ctx.user.openId.replace(/^telegram:/, "").slice(-10)}`,
           })
