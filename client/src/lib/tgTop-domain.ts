@@ -47,6 +47,7 @@ export type Nft = {
   maxRentalDays: number;
   ownerUsername: string;
   assetClass: "onchain" | "offchain";
+  category?: string | null;
   nftItemAddress?: string | null;
   ownerWalletAddress?: string | null;
   ownershipVerifiedAt?: Date | null;

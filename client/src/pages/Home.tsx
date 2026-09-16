@@ -78,6 +78,8 @@ import lottie from "lottie-web";
 import { CATEGORY_SUBCATEGORIES, CITY_OPTIONS, COUNTRY_LABELS, COUNTRY_OPTIONS, SUBCATEGORY_LABELS, type Audience, type DetailStatsPeriod, type GlobalDirection, type Group, type Language, type ListingCountry, type ListingType, type MyGroupsViewMode, type Nft, type NftDealCategory, type NftMarketCategory, type Page, type PreparedNftTransfer, type ShowcaseNft, type Slot, type TopSection, type WalletNft, type WalletNftFilter, type WorkspaceSection, getRussianLanguage, hasConfiguredRewardCampaign, setLanguagePreference } from "@/lib/tgTop-domain";
 import { NftShowcase } from "@/components/tgtop/NftShowcase";
 import { NftCard } from "@/components/tgtop/NftCard";
+import { NftRankingTile } from "@/components/NftRankingTile";
+import { NftDetailSheet } from "@/components/nft/NftDetailSheet";
 const formatTon = (value: number | string | null | undefined) => {
   const amount = typeof value === "number" ? value : Number(value);
   return Number.isFinite(amount) ? amount.toFixed(2) : "0.00";
@@ -576,15 +578,14 @@ export default function Home({ onReady }: { onReady?: () => void }) {
     if (!walletConnectionRestored) return;
     const ownerKey = "tgtop:ton-wallet-owner";
     const pendingOwnerKey = "tgtop:ton-wallet-pending-owner";
-    if (!walletAddress) {
+    if (!isAuthenticated || !user?.openId) {
       setSafeWalletAddress(null);
       setTonWithdrawalAddress("");
       return;
     }
-    const activeOwnerId = user?.openId || "current-user";
     const storedOwner = window.localStorage.getItem(ownerKey);
     const pendingOwner = window.localStorage.getItem(pendingOwnerKey);
-    if (storedOwner && user?.openId && (storedOwner !== user.openId && pendingOwner !== user.openId)) {
+    if (walletAddress && storedOwner !== user.openId && pendingOwner !== user.openId) {
       setSafeWalletAddress(null);
       setTonWithdrawalAddress("");
       void tonConnectUi.disconnect().catch(() => undefined);
@@ -593,15 +594,17 @@ export default function Home({ onReady }: { onReady?: () => void }) {
       toast.error(language === "en" ? "The previous wallet session was disconnected for your safety." : "Предыдущая сессия кошелька отключена для безопасности.");
       return;
     }
-    window.localStorage.setItem(ownerKey, activeOwnerId);
-    window.localStorage.removeItem(pendingOwnerKey);
-    setSafeWalletAddress(walletAddress);
-    const tonWithdrawalDefaultRecipient = safeWalletAddress ?? "";
-    setTonWithdrawalAddress(safeWalletAddress ?? "");
+    if (walletAddress && (storedOwner === user.openId || pendingOwner === user.openId)) {
+      window.localStorage.setItem(ownerKey, user.openId);
+      window.localStorage.removeItem(pendingOwnerKey);
+      setSafeWalletAddress(walletAddress);
+      return;
+    }
+    setSafeWalletAddress(null);
+    setTonWithdrawalAddress("");
   }, [isAuthenticated, tonConnectUi, user?.openId, walletAddress, walletConnectionRestored]);
   const openTonWalletForCurrentUser = () => {
-    const activeOwnerId = user?.openId || "current-user";
-    window.localStorage.setItem("tgtop:ton-wallet-pending-owner", activeOwnerId);
+    if (user?.openId) window.localStorage.setItem("tgtop:ton-wallet-pending-owner", user.openId);
     tonConnectUi.openModal();
   };
   const disconnectTonWallet = async () => {
@@ -1053,6 +1056,9 @@ export default function Home({ onReady }: { onReady?: () => void }) {
   const [nftListingInstallmentDays, setNftListingInstallmentDays] = useState(30);
   const [nftBuySheetOpen, setNftBuySheetOpen] = useState(false);
   const [selectedNftForBuy, setSelectedNftForBuy] = useState<Nft | null>(null);
+  const [selectedNftForDetail, setSelectedNftForDetail] = useState<Nft | null>(null);
+  const [selectedNftDetailRank, setSelectedNftDetailRank] = useState<number>(1);
+  const [nftDetailSheetOpen, setNftDetailSheetOpen] = useState(false);
   const [nftRentalSheetOpen, setNftRentalSheetOpen] = useState(false);
   const [selectedNftForRent, setSelectedNftForRent] = useState<Nft | null>(null);
   const [rentalDaysInput, setRentalDaysInput] = useState(7);
@@ -1194,10 +1200,6 @@ export default function Home({ onReady }: { onReady?: () => void }) {
       void utils.tgTop.getTonWithdrawals.invalidate();
       void utils.tgTop.getAccount.invalidate();
       void utils.tgTop.getAccountActivity.invalidate();
-      toast.success(tx("Заявка на вывод принята", "Withdrawal request accepted"));
-      setTonWithdrawalOpen(false);
-      setTonWithdrawalFlow("form");
-      setActiveTonWithdrawalId(null);
     },
     onError: error => toast.error(error.message),
   });
@@ -1219,17 +1221,6 @@ export default function Home({ onReady }: { onReady?: () => void }) {
     },
     // Сверка работает в фоне и повторяется автоматически; временная ошибка сети не должна спамить toast.
     onError: () => undefined,
-  });
-  const cancelTonWithdrawalMutation = trpc.tgTop.cancelTonWithdrawal.useMutation({
-    onSuccess: () => {
-      void utils.tgTop.getTonWithdrawals.invalidate();
-      void utils.tgTop.getAccount.invalidate();
-      void utils.tgTop.getAccountActivity.invalidate();
-      setActiveTonWithdrawalId(null);
-      setTonWithdrawalFlow("form");
-      toast.success(tx("Вывод отменён, GRAM возвращены на баланс", "Withdrawal cancelled, GRAM returned to balance"));
-    },
-    onError: error => toast.error(error.message),
   });
   useEffect(() => {
     if (!activeTonWithdrawalId) return;
@@ -1253,20 +1244,6 @@ export default function Home({ onReady }: { onReady?: () => void }) {
     setTonWithdrawalOpen(false);
     toast.error("Вывод отменён до отправки. GRAM остались на основном балансе.");
   }, [activeTonWithdrawalId, tonWithdrawals]);
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const pendingDeposit = tonDeposits.find(d => d.status === "created" || d.status === "submitted");
-    if (!pendingDeposit) return;
-    const checkDeposit = () => {
-      if (!verifyTonDepositMutation.isPending) {
-        verifyTonDepositMutation.mutate({ depositId: pendingDeposit.id });
-      }
-    };
-    checkDeposit();
-    const timer = window.setInterval(checkDeposit, 6_000);
-    return () => window.clearInterval(timer);
-  }, [isAuthenticated, tonDeposits, verifyTonDepositMutation]);
-
   const startTonDeposit = async () => {
     if (!walletConnectionRestored) return;
     if (!safeWalletAddress) {
@@ -1301,6 +1278,8 @@ export default function Home({ onReady }: { onReady?: () => void }) {
         destinationWalletAddress: quote.destinationWalletAddress,
         idempotencyKey,
       });
+      setActiveTonWithdrawalId(withdrawal.id);
+      setTonWithdrawalFlow("processing");
     } finally {
       tonWithdrawalSubmitInFlight.current = false;
     }
@@ -1721,24 +1700,23 @@ export default function Home({ onReady }: { onReady?: () => void }) {
       return group.membersCount >= 1000 && group.membersCount < 10000;
     return group.membersCount >= 10000;
   };
-  const visibleGroups = useMemo(() => {
-    const filtered = listedGroups.filter(matchesAudience);
-    const uniqueGroups: Group[] = [];
-    const seenIds = new Set<number>();
-    const seenUsernames = new Set<string>();
-    for (const group of filtered) {
-      if (seenIds.has(group.id)) continue;
-      if (group.username && seenUsernames.has(group.username.toLowerCase())) continue;
-      seenIds.add(group.id);
-      if (group.username) seenUsernames.add(group.username.toLowerCase());
-      uniqueGroups.push(group);
-    }
-    return uniqueGroups;
-  }, [listedGroups, audience]);
+  const visibleGroups = useMemo(
+    () => listedGroups.filter(matchesAudience),
+    [listedGroups, audience]
+  );
   const visibleNfts = useMemo(
     () => {
-      const byMarketCategory = nftMarketCategory === "all" || nftMarketCategory === "usernames" ? nfts : [];
-      const byAssetClass = nftAssetFilter === "all" ? byMarketCategory : byMarketCategory.filter(nft => nft.assetClass === nftAssetFilter);
+      let list = [...nfts];
+      if (nftMarketCategory === "gifts") {
+        list = list.filter(nft => nft.category === "gifts" || nft.username.toLowerCase().includes("gift"));
+      } else if (nftMarketCategory === "usernames") {
+        list = list.filter(nft => !nft.username.toLowerCase().includes("gift") && !nft.username.startsWith("+") && nft.category !== "gifts" && nft.category !== "anonymous_numbers");
+      } else if (nftMarketCategory === "anonymous_numbers") {
+        list = list.filter(nft => nft.username.startsWith("+") || nft.category === "anonymous_numbers");
+      } else if (nftMarketCategory === "other") {
+        list = list.filter(nft => nft.category === "other" || nft.category === "domains");
+      }
+      const byAssetClass = nftAssetFilter === "all" ? list : list.filter(nft => nft.assetClass === nftAssetFilter);
       const byDealCategory = nftDealCategory === "all"
         ? byAssetClass
         : nftDealCategory === "sale"
@@ -1749,33 +1727,30 @@ export default function Home({ onReady }: { onReady?: () => void }) {
               ? byAssetClass.filter(nft => Boolean(nft.installmentsAvailable) || nft.modes?.includes("installments"))
               : byAssetClass;
       const query = topSearchQuery.trim().toLowerCase();
-      return query
+      const filtered = query
         ? byDealCategory.filter(nft => `${nft.username} ${nft.ownerUsername}`.toLowerCase().includes(query))
         : byDealCategory;
+
+      return filtered.sort((a, b) => {
+        const aVal = (a as any).bidAmount ?? (Number(a.price?.replace(/[^0-9.]/g, "")) || 0);
+        const bVal = (b as any).bidAmount ?? (Number(b.price?.replace(/[^0-9.]/g, "")) || 0);
+        return bVal - aVal;
+      });
     },
     [nfts, nftAssetFilter, nftMarketCategory, nftDealCategory, topSearchQuery]
   );
   const compactRankedSlots = useMemo(() => {
     const seen = new Set<number>();
-    const seenUsernames = new Set<string>();
     return slots.filter(slot => {
       if (!slot.group || !matchesAudience(slot.group)) return false;
       if (seen.has(slot.group.id)) return false;
-      if (slot.group.username && seenUsernames.has(slot.group.username.toLowerCase())) return false;
       seen.add(slot.group.id);
-      if (slot.group.username) seenUsernames.add(slot.group.username.toLowerCase());
       return true;
     });
   }, [slots, audience]);
   const fallbackRankedGroups = useMemo(() => {
     const rankedIds = new Set(compactRankedSlots.flatMap(slot => slot.group ? [slot.group.id] : []));
-    const rankedUsernames = new Set(compactRankedSlots.flatMap(slot => slot.group?.username ? [slot.group.username.toLowerCase()] : []));
-    
-    return visibleGroups.filter(group => {
-      if (rankedIds.has(group.id)) return false;
-      if (group.username && rankedUsernames.has(group.username.toLowerCase())) return false;
-      return true;
-    });
+    return visibleGroups.filter(group => !rankedIds.has(group.id));
   }, [compactRankedSlots, visibleGroups]);
   const board = useMemo(() => {
     const vacantSlots = slots.filter(slot => !slot.isOccupied).sort((left, right) => left.slotNumber - right.slotNumber);
@@ -1807,7 +1782,6 @@ export default function Home({ onReady }: { onReady?: () => void }) {
   const rankingContinuation = compactRankedSlots.slice(7);
   const rankedGroups = [...board, ...rankingContinuation].flatMap(slot => slot.group ? [slot.group] : []);
   const rankedGroupIds = new Set(rankedGroups.map(group => group.id));
-  const rankedGroupUsernames = new Set(rankedGroups.flatMap(group => group.username ? [group.username.toLowerCase()] : []));
   const firstAvailableRankingSlot = slots
     .filter(slot => !slot.isOccupied && matchesAudience(slot.group))
     .sort((left, right) => left.slotNumber - right.slotNumber)[0] ?? null;
@@ -1817,11 +1791,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
       const bidDifference = getMinimumRankingBidGram(left) - getMinimumRankingBidGram(right);
       return bidDifference || left.slotNumber - right.slotNumber;
     })[0] ?? null;
-  const generalList = visibleGroups.filter(group => {
-    if (rankedGroupIds.has(group.id)) return false;
-    if (group.username && rankedGroupUsernames.has(group.username.toLowerCase())) return false;
-    return true;
-  });
+  const generalList = visibleGroups.filter(group => !rankedGroupIds.has(group.id));
   const searchCandidates = topSearchQuery.trim() ? [...rankedGroups, ...generalList] : generalList;
   const searchedGeneralList = searchCandidates.filter(group => {
     const query = topSearchQuery.trim().toLowerCase();
@@ -2902,79 +2872,164 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                 />
               </section>
             ) : topSection === "nft" ? (
-              <section className="space-y-2 pt-1">
+              <section className="space-y-3 pt-1">
                 <div className="flex items-center justify-between px-1">
-                  <span>
-                    <h2 className="text-sm font-semibold text-slate-200">{tx("NFT-направление", "NFT marketplace")}</h2>
-                    <span className="text-[10px] text-slate-500">{tx("цифровые активы Telegram", "Telegram digital assets")}</span>
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    {isAuthenticated && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setNftListingAssetClass("offchain");
-                            setNftListingItemAddress("");
-                            setNftListingUsername("");
-                            setNftListingSheetOpen(true);
-                          }}
-                          className="flex items-center gap-1 rounded-lg border border-emerald-500/35 bg-emerald-500/12 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/20 active:scale-[0.98]"
-                        >
-                          <Plus className="h-3 w-3" />
-                          {tx("Залистить NFT", "List NFT")}
-                        </button>
-                        <button onClick={openNftTransfer} className="rounded-lg border border-[#3f8cff]/35 bg-[#3f8cff]/10 px-2.5 py-1.5 text-[10px] font-semibold text-[#a6c8ff]">
-                          {tx("Заявка на передачу", "Transfer request")}
-                        </button>
-                      </>
-                    )}
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-200">{tx("NFT и Подарки", "NFT & Gifts")}</h2>
+                    <span className="text-[10px] text-slate-500">{tx("Аукцион позиций и витрина активов Telegram", "Telegram asset auction & ranking")}</span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setNftListingSheetOpen(true)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#3f8cff]/30 bg-[#3f8cff]/10 px-3 text-[10px] font-semibold text-[#c8ddff] transition-all hover:bg-[#3f8cff]/20 active:scale-[0.98]"
+                  >
+                    <Plus className="h-3.5 w-3.5 shrink-0" />
+                    <span>{tx("Добавить", "Add")}</span>
+                  </button>
                 </div>
                 <div aria-label="Рубрики NFT" className="flex gap-1.5 overflow-x-auto rounded-lg border border-white/8 bg-[#111720] p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {([
                     ["all", tx("Все", "All")],
-                    ["gifts", tx("Гифты", "Gifts")],
+                    ["gifts", tx("Подарки", "Gifts")],
                     ["usernames", tx("Юзернеймы", "Usernames")],
-                    ["anonymous_numbers", tx("Анонимные номера", "Anonymous numbers")],
-                    ["other", tx("Другие NFT", "Other NFTs")],
+                    ["anonymous_numbers", tx("Анонимные номера", "Numbers")],
+                    ["other", tx("Другие", "Other")],
                   ] as const).map(([value, label]) => (
-                    <button key={value} type="button" onClick={() => setNftMarketCategory(value)} className={`h-8 shrink-0 rounded-md px-3 text-[10px] font-semibold transition-colors ${nftMarketCategory === value ? "bg-[#3f8cff] text-white shadow-sm" : "text-slate-500 hover:bg-white/5 hover:text-slate-200"}`}>{label}</button>
+                    <button key={value} type="button" onClick={() => setNftMarketCategory(value)} className={`h-8 shrink-0 rounded-md px-3 text-[10px] font-semibold transition-colors ${nftMarketCategory === value ? "bg-[#3f8cff] text-white shadow-sm font-bold" : "text-slate-400 hover:bg-white/5 hover:text-slate-200"}`}>{label}</button>
                   ))}
                 </div>
                 {nftsQuery.isLoading ? (
                   <div className="rounded-2xl border border-white/8 bg-[#111720] p-6 text-center text-sm text-slate-500">{ui.loading}</div>
                 ) : visibleNfts.length ? (
                   <div className="space-y-2">
-                    {visibleNfts.map(nft => (
-                      <NftCard
-                        key={nft.id}
-                        nft={nft}
+                    {/* Rank #1: Lead Tile */}
+                    {visibleNfts[0] && (
+                      <NftRankingTile
+                        key={visibleNfts[0].id}
+                        nft={visibleNfts[0]}
+                        rank={1}
+                        variant="lead"
                         language={language}
-                        onBuy={targetNft => {
-                          setSelectedNftForBuy(targetNft);
-                          setNftBuySheetOpen(true);
-                        }}
-                        onRent={targetNft => {
-                          setSelectedNftForRent(targetNft);
-                          setRentalDaysInput(targetNft.minRentalDays || 7);
-                          setNftRentalSheetOpen(true);
-                        }}
-                        onInstallments={targetNft => {
-                          setSelectedNftForInstallment(targetNft);
-                          setInstallmentDaysInput(targetNft.installmentsPeriodDays ?? 30);
-                          setInstallmentDownPaymentInput(targetNft.installmentsDownPayment ?? String((Number(targetNft.price) * 0.3).toFixed(2)));
-                          setNftInstallmentSheetOpen(true);
+                        onClick={nft => {
+                          setSelectedNftForDetail(nft);
+                          setSelectedNftDetailRank(1);
+                          setNftDetailSheetOpen(true);
                         }}
                       />
-                    ))}
+                    )}
+
+                    {/* Rank #2 & #3: Secondary Bento Grid */}
+                    {visibleNfts.length > 1 && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {visibleNfts.slice(1, 3).map((nft, idx) => (
+                          <NftRankingTile
+                            key={nft.id}
+                            nft={nft}
+                            rank={idx + 2}
+                            variant="secondary"
+                            language={language}
+                            onClick={target => {
+                              setSelectedNftForDetail(target);
+                              setSelectedNftDetailRank(idx + 2);
+                              setNftDetailSheetOpen(true);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Rank #4 to #7: Compact 4-Column Grid */}
+                    {visibleNfts.length > 3 && (
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {visibleNfts.slice(3, 7).map((nft, idx) => (
+                          <NftRankingTile
+                            key={nft.id}
+                            nft={nft}
+                            rank={idx + 4}
+                            variant="compact"
+                            language={language}
+                            onClick={target => {
+                              setSelectedNftForDetail(target);
+                              setSelectedNftDetailRank(idx + 4);
+                              setNftDetailSheetOpen(true);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Rank #8+: Regular 2-Column Grid */}
+                    {visibleNfts.length > 7 && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {visibleNfts.slice(7).map((nft, idx) => (
+                          <NftRankingTile
+                            key={nft.id}
+                            nft={nft}
+                            rank={idx + 8}
+                            variant="grid"
+                            language={language}
+                            onClick={target => {
+                              setSelectedNftForDetail(target);
+                              setSelectedNftDetailRank(idx + 8);
+                              setNftDetailSheetOpen(true);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Fast add button */}
+                    <button
+                      type="button"
+                      onClick={() => setNftListingSheetOpen(true)}
+                      className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#3f8cff]/30 bg-[#3f8cff]/[0.04] text-xs font-semibold text-[#a6c8ff] transition-all hover:bg-[#3f8cff]/10 active:scale-[0.985]"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>{tx("Добавить свой NFT / Подарок в ТОП", "Add your NFT / Gift to TOP")}</span>
+                    </button>
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-white/12 bg-[#111720] p-7 text-center">
                     <p className="text-sm font-medium text-slate-300">{tx("В этой категории NFT пока нет", "No NFTs in this category yet")}</p>
                     <p className="mt-1 text-xs leading-5 text-slate-500">{nftDealCategory === "auction" || nftDealCategory === "installments" || nftDealCategory === "collateral" ? tx("Первые предложения появятся после безопасного листинга владельцами. Никакие платежи или передачи здесь ещё не создаются.", "Offers will appear after owners create secure listings. No payment or transfer is created here.") : nftMarketCategory === "usernames" ? tx("Юзернеймы появятся здесь после размещения владельцем.", "Usernames will appear here after owner listing.") : tx("Раздел появится после добавления первых активов.", "This category will appear after the first assets are added.")}</p>
+                    <button
+                      type="button"
+                      onClick={() => setNftListingSheetOpen(true)}
+                      className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#3f8cff] px-4 text-xs font-bold text-white shadow-md shadow-[#3f8cff]/20 transition-all hover:bg-[#3377dd] active:scale-[0.98]"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>{tx("Залистить первый актив", "List First Asset")}</span>
+                    </button>
                   </div>
                 )}
+
+                {/* NFT Detail Sheet */}
+                <NftDetailSheet
+                  open={nftDetailSheetOpen}
+                  onOpenChange={setNftDetailSheetOpen}
+                  nft={selectedNftForDetail}
+                  rank={selectedNftDetailRank}
+                  language={language}
+                  onBuy={targetNft => {
+                    setSelectedNftForBuy(targetNft);
+                    setNftBuySheetOpen(true);
+                  }}
+                  onBid={targetNft => {
+                    setNftListingUsername(targetNft.username);
+                    setNftListingSheetOpen(true);
+                  }}
+                  onRent={targetNft => {
+                    setSelectedNftForRent(targetNft);
+                    setRentalDaysInput(targetNft.minRentalDays || 7);
+                    setNftRentalSheetOpen(true);
+                  }}
+                  onInstallments={targetNft => {
+                    setSelectedNftForInstallment(targetNft);
+                    setInstallmentDaysInput(targetNft.installmentsPeriodDays ?? 30);
+                    setInstallmentDownPaymentInput(targetNft.installmentsDownPayment ?? String((Number(targetNft.price) * 0.3).toFixed(2)));
+                    setNftInstallmentSheetOpen(true);
+                  }}
+                />
 
                 {/* NFT Listing Sheet */}
                 <NftListingSheet
@@ -3969,7 +4024,6 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     </section>
                   )}
                 </div>
-                <NftShowcase nfts={detail.ownerNfts} language={language} title={tx("NFT-витрина площадки", "Community NFT showcase")} />
               </>
             ) : (
               <p className="py-16 text-center text-sm text-slate-500">
@@ -4000,7 +4054,6 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                   <h2 className="px-1 text-sm font-semibold">{tx("Площадки владельца", "Owner communities")}</h2>
                   {publicOwner.groups.map(group => <CompactCommunityRow key={group.id} group={group} language={language} accessLabel={getCommunityAccessLabel(group, language)} salePrice={group.listingType === "sale" && group.salePriceTon ? formatTon(group.salePriceTon) : undefined} onOpen={() => openGroup(group.id)} />)}
                 </section>
-                <NftShowcase nfts={publicOwner.nfts} language={language} title={tx("NFT-витрина владельца", "Owner NFT showcase")} />
               </>
             ) : (
               <p className="py-16 text-center text-sm text-slate-500">{tx("Загружаем профиль владельца…", "Loading owner profile…")}</p>
@@ -4263,14 +4316,14 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                 <WalletConnectControl language={language} balanceTon={formatTon(Number(mainTon))} variant="profile" ownerOpenId={user?.openId} address={safeWalletAddress} restored={walletConnectionRestored} onDisconnect={disconnectTonWallet} />
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <Sheet open={tonDepositOpen} onOpenChange={setTonDepositOpen}>
-                    <button type="button" onClick={() => { if (!safeWalletAddress) { openTonWalletForCurrentUser(); } else { setTonDepositOpen(true); } }} aria-label={tx("Пополнить баланс GRAM", "Deposit GRAM balance")} className="tg-profile-balance-action tg-profile-deposit-action rounded-xl border border-[#3f8cff]/35 bg-[#3f8cff]/10 px-3 py-2 text-left transition-colors hover:bg-[#3f8cff]/18"><b className="block text-[11px] text-[#c8ddff]">{tx("Пополнить", "Deposit")}</b><small className="mt-0.5 block text-[9px] text-[#8fb9ff]">GRAM</small></button>
+                    <button type="button" onClick={() => setTonDepositOpen(true)} aria-label={tx("Пополнить баланс GRAM", "Deposit GRAM balance")} className="tg-profile-balance-action tg-profile-deposit-action rounded-xl border border-[#3f8cff]/35 bg-[#3f8cff]/10 px-3 py-2 text-left transition-colors hover:bg-[#3f8cff]/18"><b className="block text-[11px] text-[#c8ddff]">{tx("Пополнить", "Deposit")}</b><small className="mt-0.5 block text-[9px] text-[#8fb9ff]">GRAM</small></button>
                     <SheetContent side="bottom" onOpenAutoFocus={event => event.preventDefault()} className="max-h-[84dvh] rounded-t-[22px] border-white/10 bg-[#10161f] text-slate-100">
                       <SheetHeader className="px-4 pb-3 text-left">
                         <SheetTitle className="text-base text-slate-100">{tx("Пополнить баланс GRAM", "Deposit GRAM balance")}</SheetTitle>
                         <p className="text-[11px] leading-4 text-slate-500">{tx("Сумму и перевод подтверждаете только вы в своём кошельке. Баланс обновится после проверки сети.", "Only you confirm the amount and transfer in your wallet. The balance updates after network verification.")}</p>
                       </SheetHeader>
                       <div className="space-y-3 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-                        {!safeWalletAddress ? <button type="button" onClick={() => { setTonDepositOpen(false); setTimeout(() => openTonWalletForCurrentUser(), 150); }} className="flex w-full items-center justify-center rounded-xl bg-[#3390ec] px-3 py-3 text-sm font-semibold text-white">{tx("Подключить кошелёк", "Connect wallet")}</button> : <>
+                        {!safeWalletAddress ? <button type="button" onClick={openTonWalletForCurrentUser} className="flex w-full items-center justify-center rounded-xl bg-[#3390ec] px-3 py-3 text-sm font-semibold text-white">{tx("Подключить кошелёк", "Connect wallet")}</button> : <>
                           <label className="block"><span className="mb-2 block text-center text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">{tx("Сумма · GRAM", "Amount · GRAM")}</span><div className="relative"><Input value={tonDepositAmount} inputMode="decimal" onChange={event => { const value = event.target.value.replace(",", "."); if (/^\d*(\.\d{0,9})?$/.test(value)) setTonDepositAmount(value); }} placeholder="1" className="h-16 rounded-2xl border-white/10 bg-white/[0.045] px-16 text-center text-6xl leading-none font-semibold tracking-tight text-[#bcd8ff]" /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-[#8fb9ff]">GRAM</span></div><small className="mt-2 block text-center text-[11px] text-slate-500">{tx("Минимум 0.01 GRAM", "Minimum 0.01 GRAM")}</small></label>
                           <button type="button" disabled={!walletConnectionRestored || createTonDepositMutation.isPending || markTonDepositSubmittedMutation.isPending} onClick={() => void startTonDeposit()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#3390ec] px-3 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#4199ee] disabled:opacity-50"><WalletCards className="h-4 w-4" />{createTonDepositMutation.isPending ? tx("Готовим перевод…", "Preparing transfer…") : tx("Подтвердить в кошельке", "Confirm in wallet")}</button>
                         </>}
@@ -4280,79 +4333,39 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                   </Sheet>
                     <Sheet open={tonWithdrawalOpen} onOpenChange={open => {
                       setTonWithdrawalOpen(open);
+                      if (!open) {
+                        setTonWithdrawalFlow("form");
+                        setActiveTonWithdrawalId(null);
+                        return;
+                      }
                       if (open) {
-                        setTonWithdrawalAddress(current => current || safeWalletAddress || tonWithdrawalDefaultRecipient || "");
+                      setTonWithdrawalAddress(current => safeWalletAddress ? current || tonWithdrawalDefaultRecipient : "");
+                      const pending = tonWithdrawals.find(item => item.status === "broadcast_pending" || item.status === "sent");
+                      if (pending) {
+                        setActiveTonWithdrawalId(pending.id);
+                        setTonWithdrawalFlow("processing");
+                      } else {
                         setTonWithdrawalFlow("form");
                         setActiveTonWithdrawalId(null);
                       }
-                    }}>
-                    <button type="button" onClick={() => { if (!safeWalletAddress) { openTonWalletForCurrentUser(); } else { setTonWithdrawalOpen(true); } }} aria-label={tx("Вывести GRAM", "Withdraw GRAM")} className="tg-profile-balance-action tg-profile-withdraw-action rounded-xl border border-emerald-400/25 bg-emerald-400/[0.07] px-3 py-2 text-left transition-colors hover:bg-emerald-400/[0.13]"><b className="block text-[11px] text-emerald-100">{tx("Вывести", "Withdraw")}</b><small className="mt-0.5 block text-[9px] text-emerald-300/75">GRAM</small></button>
+                    }
+                  }}>
+                    <button type="button" onClick={() => setTonWithdrawalOpen(true)} aria-label={tx("Вывести GRAM", "Withdraw GRAM")} className="tg-profile-balance-action tg-profile-withdraw-action rounded-xl border border-emerald-400/25 bg-emerald-400/[0.07] px-3 py-2 text-left transition-colors hover:bg-emerald-400/[0.13]"><b className="block text-[11px] text-emerald-100">{tx("Вывести", "Withdraw")}</b><small className="mt-0.5 block text-[9px] text-emerald-300/75">GRAM</small></button>
                     <SheetContent side="bottom" onOpenAutoFocus={event => event.preventDefault()} className="max-h-[76dvh] overflow-y-auto rounded-t-[24px] border-white/10 bg-[#10161f] text-slate-100">
                       <SheetHeader className="px-4 pb-2 text-left">
                         <SheetTitle className="text-base font-semibold text-slate-100">{tx("Вывод GRAM", "Withdraw GRAM")}</SheetTitle>
+                        <p className="mt-0.5 text-[11px] leading-4 text-slate-500">{tx("Доступен только основной баланс. Бонусные GRAM не выводятся.", "Only your main balance is withdrawable. Bonus GRAM cannot be withdrawn.")}</p>
                       </SheetHeader>
-                      <div className="space-y-3 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-                        {!safeWalletAddress ? (
-                          <button type="button" onClick={() => { setTonWithdrawalOpen(false); setTimeout(() => openTonWalletForCurrentUser(), 150); }} className="flex w-full items-center justify-center rounded-xl bg-[#3390ec] px-3 py-3 text-sm font-semibold text-white">{tx("Подключить кошелёк", "Connect wallet")}</button>
-                        ) : (
-                          <>
-                            <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-3.5 py-2.5">
-                              <span className="flex items-center gap-2 font-mono text-xs text-slate-200">
-                                <WalletCards className="h-4 w-4 shrink-0 text-[#8fb9ff]" />
-                                {tonWithdrawalAddress ? `${tonWithdrawalAddress.slice(0, 6)}…${tonWithdrawalAddress.slice(-4)}` : tx("Кошелёк", "Wallet")}
-                              </span>
-                              <button type="button" onClick={() => void disconnectTonWallet()} className="shrink-0 text-[11px] font-medium text-rose-400 hover:underline">{tx("Отключить", "Disconnect")}</button>
-                            </div>
+                      <div className="space-y-2.5 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                        {tonWithdrawalFlow === "form" && (!safeWalletAddress ? <button type="button" onClick={openTonWalletForCurrentUser} className="flex w-full items-center justify-center rounded-xl bg-[#3390ec] px-3 py-3 text-sm font-semibold text-white">{tx("Подключить кошелёк", "Connect wallet")}</button> : <>
+                          <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.035] px-3 py-2"><span className="min-w-0"><span className="block text-[9px] uppercase tracking-[0.1em] text-slate-500">{tx("Кошелёк вывода", "Withdrawal wallet")}</span><span className="mt-0.5 flex items-center gap-1.5 font-mono text-xs text-slate-100"><WalletCards className="h-3.5 w-3.5 shrink-0 text-[#8fb9ff]" />{tonWithdrawalAddress ? `${tonWithdrawalAddress.slice(0, 5)}…${tonWithdrawalAddress.slice(-4)}` : tx("Загрузка…", "Loading…")}</span></span><button type="button" onClick={() => void disconnectTonWallet()} className="shrink-0 rounded-lg border border-rose-300/25 bg-rose-500/[0.08] px-2 py-1.5 text-[10px] font-semibold text-rose-100 transition-colors hover:bg-rose-500/[0.14]">{tx("Отключить", "Disconnect")}</button></div>
+                          <div className="flex items-baseline justify-between rounded-xl border border-emerald-300/15 bg-emerald-400/[0.045] px-3 py-2"><span className="text-[10px] uppercase tracking-[0.1em] text-slate-500">{tx("Доступно", "Available")}</span><b className="text-xl font-semibold tracking-tight text-emerald-200">{mainTon} <span className="text-xs font-medium">GRAM</span></b></div>
+                          <label className="block"><span className="mb-1.5 block text-center text-[10px] font-medium uppercase tracking-[0.1em] text-slate-400">{tx("Сумма вывода · GRAM", "Withdrawal amount · GRAM")}</span><div className="relative"><Input value={tonWithdrawalAmount} inputMode="decimal" onChange={event => { const value = event.target.value.replace(",", "."); if (/^\d*(\.\d{0,9})?$/.test(value)) setTonWithdrawalAmount(value); }} className="h-12 rounded-xl border-white/10 bg-white/[0.045] px-16 text-center text-3xl leading-none font-semibold tracking-tight text-emerald-100" placeholder="0.1" /><button type="button" onClick={() => setTonWithdrawalAmount(mainTon)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg border border-emerald-300/25 bg-emerald-400/[0.12] px-2 py-1.5 text-[10px] font-semibold text-emerald-100 transition-colors hover:bg-emerald-400/[0.2]">{tx("Макс", "Max")}</button></div><button type="button" disabled={!canWithdrawMinimum} onClick={() => setTonWithdrawalAmount(mainTon)} className="mx-auto mt-1.5 block text-[10px] font-medium text-emerald-300/90 disabled:cursor-not-allowed disabled:opacity-50">{canWithdrawMinimum ? tx(`Вывести всё ${mainTon} GRAM`, `Withdraw all ${mainTon} GRAM`) : tx("Минимум для вывода — 0.10 GRAM", "Minimum withdrawal — 0.10 GRAM")}</button></label>
+                          <button type="button" disabled={!canWithdrawMinimum || quoteTonWithdrawalMutation.isPending || createTonWithdrawalMutation.isPending || !tonWithdrawalAddress || !tonWithdrawalAmount} onClick={() => void prepareTonWithdrawal()} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 text-base font-semibold text-slate-950 transition-colors hover:bg-emerald-400 disabled:opacity-50"><Send className="h-4 w-4" />{quoteTonWithdrawalMutation.isPending || createTonWithdrawalMutation.isPending ? tx("Отправляем…", "Sending…") : tx("Вывести", "Withdraw")}</button>
+                        </>)}
 
-                            <div className="relative">
-                              <Input
-                                value={tonWithdrawalAmount}
-                                inputMode="decimal"
-                                onChange={event => {
-                                  const value = event.target.value.replace(",", ".");
-                                  if (/^\d*(\.\d{0,9})?$/.test(value)) setTonWithdrawalAmount(value);
-                                }}
-                                className="h-14 rounded-xl border-white/10 bg-white/[0.045] pl-4 pr-16 text-left text-2xl font-semibold text-emerald-100"
-                                placeholder="0.1"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setTonWithdrawalAmount(mainTon)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg border border-emerald-300/25 bg-emerald-400/[0.12] px-2.5 py-1 text-xs font-semibold text-emerald-100 hover:bg-emerald-400/[0.2]"
-                              >
-                                {tx("МАКС", "MAX")}
-                              </button>
-                            </div>
-
-                            <button
-                              type="button"
-                              disabled={!canWithdrawMinimum || quoteTonWithdrawalMutation.isPending || createTonWithdrawalMutation.isPending || !tonWithdrawalAddress || !tonWithdrawalAmount}
-                              onClick={() => void prepareTonWithdrawal()}
-                              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 text-base font-semibold text-slate-950 transition-colors hover:bg-emerald-400 disabled:opacity-50"
-                            >
-                              <Send className="h-4 w-4" />
-                              {quoteTonWithdrawalMutation.isPending || createTonWithdrawalMutation.isPending ? tx("Отправляем…", "Sending…") : tx("Вывести", "Withdraw")}
-                            </button>
-                          </>
-                        )}
-                        {tonWithdrawals.slice(0, 3).length > 0 && (
-                          <section className="border-t border-white/8 pt-3">
-                            <div className="mb-2 flex items-center justify-between">
-                              <b className="text-[11px] text-slate-400">{tx("История выводов", "Withdrawal history")}</b>
-                              <span className="text-[9px] text-slate-500">GRAM</span>
-                            </div>
-                            <div className="space-y-2">
-                              {tonWithdrawals.slice(0, 3).map(withdrawal => (
-                                <div key={withdrawal.id} className="rounded-xl border border-white/8 bg-white/[0.025] px-3 py-2 flex items-center justify-between gap-2">
-                                  <b className="text-sm text-slate-100">{formatFinancialGram(Number(withdrawal.grossAmountNano) / 1_000_000_000)} GRAM</b>
-                                  <span className={withdrawal.status === "confirmed" ? "text-[10px] font-medium text-emerald-300" : withdrawal.status === "cancelled" ? "text-[10px] font-medium text-rose-300" : "text-[10px] font-medium text-sky-200"}>
-                                    {withdrawal.status === "confirmed" ? tx("Отправлено", "Sent") : withdrawal.status === "cancelled" ? tx("Отмена", "Cancelled") : tx("В обработке", "Processing")}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </section>
-                        )}
+                        {tonWithdrawalFlow === "processing" && <div className="py-4 text-center"><span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-sky-300/25 bg-sky-300/[0.1]"><Send className="h-5 w-5 text-sky-200" /></span><h3 className="mt-3 text-base font-semibold">{withdrawalProcessingTitle}</h3><p className="mx-auto mt-1 max-w-[260px] text-xs leading-5 text-slate-500">{withdrawalProcessingNote}</p>{activeTonWithdrawal?.failureReason && <p className="mt-3 text-[11px] text-amber-200">{activeTonWithdrawal.failureReason}</p>}</div>}
+                        {tonWithdrawals.slice(0, 3).length > 0 && <section className="border-t border-white/8 pt-3"><div className="mb-2 flex items-center justify-between"><b className="text-[11px] text-slate-200">{tx("История выводов", "Withdrawal history")}</b><span className="text-[9px] text-slate-500">GRAM</span></div><div className="space-y-2">{tonWithdrawals.slice(0, 3).map(withdrawal => <div key={withdrawal.id} className="rounded-xl border border-white/8 bg-white/[0.025] px-3 py-2.5"><div className="flex items-center justify-between gap-2"><b className="text-sm text-slate-100">{formatFinancialGram(Number(withdrawal.grossAmountNano) / 1_000_000_000)} GRAM</b><span className={withdrawal.status === "confirmed" ? "text-[10px] font-medium text-emerald-300" : withdrawal.status === "cancelled" ? "text-[10px] font-medium text-rose-300" : "text-[10px] font-medium text-sky-200"}>{withdrawal.status === "confirmed" ? tx("Отправлено", "Sent") : withdrawal.status === "cancelled" ? tx("Отмена", "Cancelled") : tx("В обработке", "Processing")}</span></div></div>)}</div></section>}
                       </div>
                     </SheetContent>
                   </Sheet>
