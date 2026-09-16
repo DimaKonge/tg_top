@@ -91,18 +91,10 @@ export function NftDetailSheet({
       <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-[28px] border-white/10 bg-[#0e141d] p-0 text-slate-100 shadow-2xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/8 bg-[#0e141d]/90 px-5 py-4 backdrop-blur-md">
           <SheetHeader className="text-left">
-            <div className="flex items-center gap-2">
-              <SheetTitle className="text-base font-bold text-slate-100">{displayName}</SheetTitle>
-              {rank && (
-                <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">
-                  <Trophy className="h-3 w-3" />
-                  #{rank} в ТОПе
-                </span>
-              )}
-            </div>
+            <SheetTitle className="text-base font-bold text-slate-100">{displayName}</SheetTitle>
           </SheetHeader>
           <span className="rounded-md border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] font-semibold text-slate-300">
-            {nft.assetClass === "onchain" ? "On-chain" : "Off-chain"}
+            {categoryLabel}
           </span>
         </div>
 

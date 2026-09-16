@@ -2940,17 +2940,15 @@ export default function Home({ onReady }: { onReady?: () => void }) {
 
                     {/* Rank #4 to #7: Compact 4-Column Grid */}
                     {visibleNfts.length > 3 && (
-                      <div className="grid grid-cols-4 gap-1.5">
-                        {visibleNfts.slice(3, 7).map((nft, idx) => (
+                      <div className="grid grid-cols-4 gap-2">
+                        {visibleNfts.slice(3, 7).map((nft) => (
                           <NftRankingTile
                             key={nft.id}
                             nft={nft}
-                            rank={idx + 4}
                             variant="compact"
                             language={language}
                             onClick={target => {
                               setSelectedNftForDetail(target);
-                              setSelectedNftDetailRank(idx + 4);
                               setNftDetailSheetOpen(true);
                             }}
                           />
@@ -2961,16 +2959,14 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     {/* Rank #8+: Regular 2-Column Grid */}
                     {visibleNfts.length > 7 && (
                       <div className="grid grid-cols-2 gap-2">
-                        {visibleNfts.slice(7).map((nft, idx) => (
+                        {visibleNfts.slice(7).map((nft) => (
                           <NftRankingTile
                             key={nft.id}
                             nft={nft}
-                            rank={idx + 8}
-                            variant="grid"
+                            variant="secondary"
                             language={language}
                             onClick={target => {
                               setSelectedNftForDetail(target);
-                              setSelectedNftDetailRank(idx + 8);
                               setNftDetailSheetOpen(true);
                             }}
                           />
