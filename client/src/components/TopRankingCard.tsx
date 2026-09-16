@@ -97,7 +97,7 @@ export function TopRankingCard({ group, variant, language, avatarSrc: initialAva
       {group ? (
         <>
           {showTgTopPyramidAvatar ? (
-            <span className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_35%_22%,#254e7a_0%,#111720_70%)] p-[16%]">
+            <span className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_35%_22%,var(--tg-community-card-accent,#254e7a)_0%,var(--tg-community-card-bg,#111720)_70%)] p-[16%]">
               <TgTopAnimatedPyramidAvatar className="h-full w-full" title="TG TOP" />
             </span>
           ) : group.animatedAvatarUrl && !videoFailed ? (
@@ -105,7 +105,7 @@ export function TopRankingCard({ group, variant, language, avatarSrc: initialAva
           ) : avatarSrc ? (
             <img src={avatarSrc} alt="" className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${imageLoaded ? "opacity-100" : "opacity-0"}`} onLoad={() => setImageLoaded(true)} onError={() => setCandidateIndex(prev => prev + 1)} />
           ) : (
-            <span className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_35%_22%,#254e7a_0%,#111720_70%)] p-[24%]"><TgTopAnimatedPyramidAvatar className="h-full w-full" title="TG TOP" /></span>
+            <span className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_35%_22%,var(--tg-community-card-accent,#254e7a)_0%,var(--tg-community-card-bg,#111720)_70%)] p-[24%]"><TgTopAnimatedPyramidAvatar className="h-full w-full" title="TG TOP" /></span>
           )}
           <span className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,10,15,0.06)_8%,rgba(7,10,15,0.82)_100%)]" />
           <span className={`tg-media-overlay-content absolute inset-x-0 bottom-0 min-w-0 ${compact ? "p-2" : lead ? "p-5 sm:p-6" : "p-3 sm:p-4"}`}>

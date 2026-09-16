@@ -355,12 +355,14 @@ html[data-background] .tg-top-pyramid-avatar { color: var(--tg-accent) !importan
 html[data-background] .tg-launch { background: var(--tg-shell-bg) !important; }
 
 .tg-community-card {
-  background: var(--tg-community-card-bg, var(--tg-surface)) !important;
-  border-color: color-mix(in srgb, var(--tg-community-card-accent, var(--tg-accent)) 34%, white 8%) !important;
+  background: radial-gradient(circle at 85% 15%, color-mix(in srgb, var(--tg-community-card-accent, var(--tg-accent)) 24%, transparent), transparent 70%),
+              linear-gradient(145deg, color-mix(in srgb, var(--tg-community-card-bg, var(--tg-surface)) 76%, var(--tg-community-card-accent, var(--tg-accent)) 24%), var(--tg-community-card-bg, var(--tg-surface))) !important;
+  border-color: color-mix(in srgb, var(--tg-community-card-accent, var(--tg-accent)) 60%, white 12%) !important;
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--tg-community-card-accent, var(--tg-accent)) 14%, transparent);
 }
 .tg-community-card:hover {
-  border-color: color-mix(in srgb, var(--tg-community-card-accent, var(--tg-accent)) 64%, transparent) !important;
-  box-shadow: 0 10px 28px color-mix(in srgb, var(--tg-community-card-accent, var(--tg-accent)) 18%, transparent) !important;
+  border-color: color-mix(in srgb, var(--tg-community-card-accent, var(--tg-accent)) 85%, white 15%) !important;
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--tg-community-card-accent, var(--tg-accent)) 25%, transparent) !important;
 }
 
 /* White background theme: crisp pure white surfaces with sleek dark/black active buttons */

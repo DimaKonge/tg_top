@@ -3768,6 +3768,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       <b className="truncate text-[9px] leading-3">{detail.group.managerName ?? "Менеджер"}</b>
                     </button>}
                   </div>
+                </div>
 
                   {detail && <section className="mt-3 rounded-xl border border-[#31435f] bg-[#202b3a] p-3">
                     <div className="flex items-center justify-between gap-2">
@@ -3829,7 +3830,6 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       </div>}
                     </section>
                   )}
-                </div>
                 <div className="relative flex flex-col">
                   {detail && ownsDetail && (
                     <section className="order-3 mt-2 rounded-xl border border-[#30415d] bg-[#111d32]/90 p-1.5">
