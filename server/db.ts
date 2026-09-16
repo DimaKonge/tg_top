@@ -3525,14 +3525,17 @@ export async function getNftUsernames(ownerOpenId?: string) {
     const rows = await db.select().from(nftUsernames).where(eq(nftUsernames.ownerOpenId, ownerOpenId)).orderBy(desc(nftUsernames.createdAt));
     return rows.map(enrichNftRow);
   }
-  let rows = await db.select().from(nftUsernames).where(eq(nftUsernames.status, "available")).orderBy(desc(nftUsernames.createdAt));
-  if (rows.length === 0) {
+  let rows = await db.select().from(nftUsernames).where(eq(nftUsernames.status, "available")).orderBy(desc(nftUsernames.priceAmount));
+  if (rows.length < DEFAULT_STARTER_NFTS.length) {
     try {
+      const existingUsernames = new Set(rows.map(r => r.username.toLowerCase()));
       for (const item of DEFAULT_STARTER_NFTS) {
-        const { id: _id, ...values } = item;
-        await db.insert(nftUsernames).values(values).onDuplicateKeyUpdate({ set: { status: "available" } });
+        if (!existingUsernames.has(item.username.toLowerCase())) {
+          const { id: _id, ...values } = item;
+          await db.insert(nftUsernames).values(values).onDuplicateKeyUpdate({ set: { status: "available" } });
+        }
       }
-      rows = await db.select().from(nftUsernames).where(eq(nftUsernames.status, "available")).orderBy(desc(nftUsernames.createdAt));
+      rows = await db.select().from(nftUsernames).where(eq(nftUsernames.status, "available")).orderBy(desc(nftUsernames.priceAmount));
     } catch {
       // ignore duplicate or race errors
     }
@@ -3542,6 +3545,7 @@ export async function getNftUsernames(ownerOpenId?: string) {
   }
   return rows
     .filter(nft => canPublishNftListing({ assetClass: nft.assetClass, ownershipVerifiedAt: nft.ownershipVerifiedAt }))
+    .sort((a, b) => (b.priceAmount || 0) - (a.priceAmount || 0))
     .map(enrichNftRow);
 }
 

@@ -195,7 +195,10 @@ export function NftRankingTile({
               {displayName}
             </b>
             <small className="mt-0.5 block truncate text-[10px] text-slate-400">
-              {tx("Владелец:", "Owner:")} <span className="text-slate-200 font-medium">{nft.ownerUsername}</span>
+              {tx("Владелец:", "Owner:")}{" "}
+              <span className="text-slate-200 font-medium">
+                {nft.ownerUsername ? `@${nft.ownerUsername}` : (nft.ownerWalletAddress ? `${nft.ownerWalletAddress.slice(0, 4)}...${nft.ownerWalletAddress.slice(-4)}` : tx("Аноним", "Anonymous"))}
+              </span>
             </small>
           </div>
           <div className="flex flex-col items-end">
