@@ -4,13 +4,13 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
-import * as auctionService from "./modules/auction";
-import * as catalogService from "./modules/catalog";
-import * as moderationService from "./modules/moderation";
-import * as telegramService from "./modules/telegram";
+import { createStarsRankingInvoiceLink, createTelegramMonthlySubscriptionInviteLink, createTelegramPrivateInviteLink, createTelegramRewardInviteLink, notifyCommunityListed, notifyCommunityRemovedFromTop, notifyRecordedRankingBid } from "./telegramNotifications";
+import { getTelegramChatGifts, getTelegramGroupAdministrators, getTelegramUserAvatarUrl, resolveVerifiedGroupEntryLink } from "./telegramBot";
+import { fetchTelegramGroupProfileMedia } from "./telegramUserAgent";
 import { formatTonAmount } from "./tonFormatting";
 import { getWalletNfts } from "./tonNft";
 import { canCreateNftListing } from "./nftOwnershipPublicationPolicy";
+import { deliverOperationsLog, formatTopActivityLog } from "./telegramOperationsLogger";
 import { canResolveVerifiedEntryLink } from "./entryLinkAccess";
 import { countSuccessfulTelegramAnnouncements } from "./listingAnnouncementPolicy";
 import { telegramUserAgentRouter } from "./routers/telegramUserAgentRouter";
@@ -27,7 +27,7 @@ const MEDIA_REFRESH_COOLDOWN_MS = 10 * 60_000;
 
 async function refreshListedGroupMediaSnapshot(group: { id: number; chatId: string }) {
   try {
-    const result = await telegramService.fetchTelegramGroupProfileMedia(group.chatId, group.id);
+    const result = await fetchTelegramGroupProfileMedia(group.chatId, group.id);
     if (!shouldUpdateAnimatedAvatarSnapshot(result.mediaType, result.reason)) return;
     await db.updateGroupAnimatedAvatarSnapshot(group.id, {
       animatedAvatarKey: result.animatedAvatarKey,
@@ -90,7 +90,7 @@ export const appRouter = router({
     getSlots: publicProcedure
       .input(z.object({ category: z.string().optional(), country: z.string().optional(), subcategory: z.string().optional(), city: z.string().optional() }).optional())
       .query(async ({ input }) => {
-        return await auctionService.getAuctionSlots(input?.category, input?.country, input?.subcategory, input?.city);
+        return await db.getAuctionSlots(input?.category, input?.country, input?.subcategory, input?.city);
       }),
 
     placeBid: protectedProcedure
@@ -119,7 +119,7 @@ export const appRouter = router({
         if (!group || group.ownerOpenId !== ctx.user.openId) {
           throw new Error("Выберите свою группу из личной папки");
         }
-        const intent = await auctionService.payRankingBidWithGramCredit(
+        const intent = await db.payRankingBidWithGramCredit(
           input.slotId,
           Math.round(input.bidAmount * 1000),
           `${formatTonAmount(input.bidAmount)} GRAM`,
@@ -145,13 +145,13 @@ export const appRouter = router({
                 rewardPerManualAdd: input.rewardPerManualAdd,
               }
         );
-        void telegramService.notifyRecordedRankingBid({
+        void notifyRecordedRankingBid({
           openId: ctx.user.openId,
           groupTitle: intent.groupTitle,
           bidAmount: intent.bidAmount,
           slotNumber: intent.slotNumber,
         });
-        void telegramService.deliverOperationsLog("top_activity", telegramService.formatTopActivityLog({
+        void deliverOperationsLog("top_activity", formatTopActivityLog({
           event: "listed_in_top",
           groupTitle: intent.groupTitle,
           groupId: input.groupId,
@@ -163,13 +163,13 @@ export const appRouter = router({
     createStarsRankingPayment: protectedProcedure
       .input(z.object({ slotId: z.number().int().positive(), groupId: z.number().int().positive(), bidAmount: z.number().positive().max(1_000) }))
       .mutation(async ({ ctx, input }) => {
-        const intent = await auctionService.createStarsRankingPaymentIntent({
+        const intent = await db.createStarsRankingPaymentIntent({
           userOpenId: ctx.user.openId,
           slotId: input.slotId,
           groupId: input.groupId,
           bidAmount: Math.round(input.bidAmount * 1000),
         });
-        const invoiceLink = await telegramService.createStarsRankingInvoiceLink({
+        const invoiceLink = await createStarsRankingInvoiceLink({
           payload: intent.payload,
           starsAmount: intent.starsAmount,
           groupTitle: intent.groupTitle,
@@ -182,11 +182,11 @@ export const appRouter = router({
     getGroups: publicProcedure
       .input(z.object({ category: z.string().optional(), country: z.string().optional(), subcategory: z.string().optional(), city: z.string().optional() }).optional())
       .query(async ({ input }) => {
-        return await catalogService.getGroupsCatalog(input?.category, input?.country, input?.subcategory, input?.city);
+        return await db.getGroupsCatalog(input?.category, input?.country, input?.subcategory, input?.city);
       }),
 
     myGroups: protectedProcedure.query(async ({ ctx }) => {
-      return await catalogService.getMyGroups(ctx.user.openId);
+      return await db.getMyGroups(ctx.user.openId);
     }),
     refreshMyGroupMedia: protectedProcedure
       .input(z.object({ groupId: z.number().int().positive(), forceListedRefresh: z.boolean().default(false) }))
@@ -202,7 +202,7 @@ export const appRouter = router({
           return { groupId: group.id, refreshed: false, skipped: "cooldown" as const };
         }
         mediaRefreshCooldowns.set(cooldownKey, Date.now());
-        const result = await telegramService.fetchTelegramGroupProfileMedia(group.chatId, group.id);
+        const result = await fetchTelegramGroupProfileMedia(group.chatId, group.id);
         if (!shouldUpdateAnimatedAvatarSnapshot(result.mediaType, result.reason)) return { ...result, refreshed: false };
         const saved = await db.updateGroupAnimatedAvatarSnapshot(group.id, {
           animatedAvatarKey: result.animatedAvatarKey,
@@ -216,7 +216,7 @@ export const appRouter = router({
         const group = await db.getGroupById(input.groupId);
         if (!group || group.ownerOpenId !== ctx.user.openId) throw new Error("Сообщество недоступно для настройки менеджера");
         try {
-          return await telegramService.getTelegramGroupAdministrators(group.chatId);
+          return await getTelegramGroupAdministrators(group.chatId);
         } catch {
           throw new Error("Не удалось получить администраторов. Добавьте @TG_TOPBOT в администраторы группы и повторите попытку.");
         }
@@ -228,13 +228,13 @@ export const appRouter = router({
         if (!group || group.ownerOpenId !== ctx.user.openId) throw new Error("Сообщество недоступно для настройки менеджера");
         let administrators;
         try {
-          administrators = await telegramService.getTelegramGroupAdministrators(group.chatId);
+          administrators = await getTelegramGroupAdministrators(group.chatId);
         } catch {
           throw new Error("Не удалось проверить администраторов. Убедитесь, что @TG_TOPBOT добавлен в администраторы группы.");
         }
         const manager = administrators.find(admin => admin.telegramUserId === input.telegramUserId);
         if (!manager) throw new Error("Выбранный аккаунт больше не является администратором этой группы");
-        const avatarUrl = manager.avatarUrl ?? await telegramService.getTelegramUserAvatarUrl(manager.telegramUserId);
+        const avatarUrl = manager.avatarUrl ?? await getTelegramUserAvatarUrl(manager.telegramUserId);
         const managerWithAvatar = { ...manager, avatarUrl };
         await db.setGroupManager(ctx.user.openId, group.id, managerWithAvatar);
         return { success: true, manager: managerWithAvatar };
@@ -262,14 +262,14 @@ export const appRouter = router({
         pinnedGroupIds: z.array(z.number().int().positive()).max(100),
       }))
       .mutation(async ({ ctx, input }) => {
-        await catalogService.saveMyGroupsLayout(ctx.user.openId, input.orderedGroupIds, input.pinnedGroupIds);
+        await db.saveMyGroupsLayout(ctx.user.openId, input.orderedGroupIds, input.pinnedGroupIds);
         return { success: true } as const;
       }),
 
     getGroupDetail: publicProcedure
       .input(z.object({ groupId: z.number() }))
       .query(async ({ ctx, input }) => {
-        return await catalogService.getGroupDetail(input.groupId, ctx.user?.openId);
+        return await db.getGroupDetail(input.groupId, ctx.user?.openId);
       }),
 
     getChannelGifts: protectedProcedure
@@ -278,7 +278,7 @@ export const appRouter = router({
         const group = await db.getGroupById(input.groupId);
         if (!group || group.ownerOpenId !== ctx.user.openId) throw new Error("Подарки доступны владельцу подключённого канала");
         try {
-          return await telegramService.getTelegramChatGifts(group.chatId);
+          return await getTelegramChatGifts(group.chatId);
         } catch {
           throw new Error("Telegram пока не дал доступ к подаркам канала. Проверьте, что @TG_TOPBOT — администратор с правом публикации сообщений.");
         }
@@ -297,7 +297,7 @@ export const appRouter = router({
       }),
 
     getModerationAccess: protectedProcedure.query(async ({ ctx }) => {
-      return await moderationService.getModerationAccess(ctx.user.openId);
+      return await db.getModerationAccess(ctx.user.openId);
     }),
 
     getReferralOverview: protectedProcedure.query(async ({ ctx }) => {
@@ -317,88 +317,88 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => db.creditBonusByTelegramUsername(ctx.user.openId, input.telegramUsername, input.amount, input.reason)),
 
     getCatalogTaxonomy: publicProcedure.query(async () => {
-      return await catalogService.getCatalogTaxonomy();
+      return await db.getCatalogTaxonomy();
     }),
 
     getApprovedBots: publicProcedure
       .input(z.object({ category: z.string().trim().max(64).optional() }).optional())
       .query(async ({ input }) => {
-        return await catalogService.getApprovedBotListings(input?.category);
+        return await db.getApprovedBotListings(input?.category);
       }),
 
     myBotListings: protectedProcedure.query(async ({ ctx }) => {
-      return await catalogService.getMyBotListings(ctx.user.openId);
+      return await db.getMyBotListings(ctx.user.openId);
     }),
 
     submitBotListing: protectedProcedure
       .input(z.object({ telegramLink: z.string().trim().min(3).max(512) }))
       .mutation(async ({ ctx, input }) => {
-        return await catalogService.submitBotListing(ctx.user.openId, input.telegramLink);
+        return await db.submitBotListing(ctx.user.openId, input.telegramLink);
       }),
 
     addCatalogCountry: protectedProcedure
       .input(z.object({ code: catalogCode.max(64), label: z.string().trim().min(2).max(96) }))
       .mutation(async ({ ctx, input }) => {
-        return await catalogService.addCatalogCountry(ctx.user.openId, input);
+        return await db.addCatalogCountry(ctx.user.openId, input);
       }),
 
     deleteCatalogCountry: protectedProcedure
       .input(z.object({ countryCode: catalogCode.max(64) }))
       .mutation(async ({ ctx, input }) => {
-        await catalogService.deleteCatalogCountry(ctx.user.openId, input.countryCode);
+        await db.deleteCatalogCountry(ctx.user.openId, input.countryCode);
         return { success: true } as const;
       }),
 
     addCatalogCity: protectedProcedure
       .input(z.object({ countryCode: catalogCode.max(64), code: catalogCode, label: z.string().trim().min(2).max(128) }))
       .mutation(async ({ ctx, input }) => {
-        return await catalogService.addCatalogCity(ctx.user.openId, input);
+        return await db.addCatalogCity(ctx.user.openId, input);
       }),
 
     deleteCatalogCity: protectedProcedure
       .input(z.object({ cityId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
-        await catalogService.deleteCatalogCity(ctx.user.openId, input.cityId);
+        await db.deleteCatalogCity(ctx.user.openId, input.cityId);
         return { success: true } as const;
       }),
 
     addCatalogTopic: protectedProcedure
       .input(z.object({ category: z.enum(["Каналы", "Чаты", "Боты"]), code: catalogCode.max(64), label: z.string().trim().min(2).max(96) }))
       .mutation(async ({ ctx, input }) => {
-        return await catalogService.addCatalogTopic(ctx.user.openId, input);
+        return await db.addCatalogTopic(ctx.user.openId, input);
       }),
 
     deleteCatalogTopic: protectedProcedure
       .input(z.object({ topicId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
-        await catalogService.deleteCatalogTopic(ctx.user.openId, input.topicId);
+        await db.deleteCatalogTopic(ctx.user.openId, input.topicId);
         return { success: true } as const;
       }),
 
     getModerationQueue: protectedProcedure.query(async ({ ctx }) => {
-      const access = await moderationService.getModerationAccess(ctx.user.openId);
+      const access = await db.getModerationAccess(ctx.user.openId);
       if (!access.canModerate) throw new Error("Недостаточно прав для просмотра очереди модерации");
-      return await moderationService.getModerationQueue();
+      return await db.getModerationQueue();
     }),
 
     getBotModerationQueue: protectedProcedure.query(async ({ ctx }) => {
-      const access = await moderationService.getModerationAccess(ctx.user.openId);
+      const access = await db.getModerationAccess(ctx.user.openId);
       if (!access.canModerate) throw new Error("Недостаточно прав для просмотра заявок ботов");
-      return await catalogService.getBotModerationQueue();
+      return await db.getBotModerationQueue();
     }),
 
     getAllBotListings: protectedProcedure.query(async ({ ctx }) => {
-      const access = await moderationService.getModerationAccess(ctx.user.openId);
+      const access = await db.getModerationAccess(ctx.user.openId);
       if (!access.canModerate) throw new Error("Недостаточно прав для просмотра каталога ботов");
-      return await catalogService.getAllBotListings();
+      return await db.getAllBotListings();
     }),
 
     deleteBotListing: protectedProcedure
       .input(z.object({ botListingId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
-        const access = await moderationService.getModerationAccess(ctx.user.openId);
+        const access = await db.getModerationAccess(ctx.user.openId);
         if (!access.canModerate) throw new Error("Недостаточно прав для удаления ботов");
-        return await catalogService.deleteBotListing(ctx.user.openId, input.botListingId);
+        return await db.deleteBotListing(ctx.user.openId, input.botListingId);
       }),
 
     moderateBotListing: protectedProcedure
@@ -409,18 +409,18 @@ export const appRouter = router({
         reason: z.string().trim().max(255).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const access = await moderationService.getModerationAccess(ctx.user.openId);
+        const access = await db.getModerationAccess(ctx.user.openId);
         if (!access.canModerate) throw new Error("Недостаточно прав для модерации заявок ботов");
         if (input.action === "reject" && (!input.reason || input.reason.length < 3)) {
           throw new Error("Укажите причину отклонения заявки на бота");
         }
-        return await catalogService.moderateBotListing({ reviewerOpenId: ctx.user.openId, ...input });
+        return await db.moderateBotListing({ reviewerOpenId: ctx.user.openId, ...input });
       }),
 
     getActiveModerationListings: protectedProcedure.query(async ({ ctx }) => {
-      const access = await moderationService.getModerationAccess(ctx.user.openId);
+      const access = await db.getModerationAccess(ctx.user.openId);
       if (!access.canModerate) throw new Error("Недостаточно прав для просмотра активных лотов");
-      return await moderationService.getActiveModerationListings();
+      return await db.getActiveModerationListings();
     }),
 
     moderateGroup: protectedProcedure
@@ -430,25 +430,25 @@ export const appRouter = router({
         reason: z.string().trim().min(3).max(255),
       }))
       .mutation(async ({ ctx, input }) => {
-        const access = await moderationService.getModerationAccess(ctx.user.openId);
+        const access = await db.getModerationAccess(ctx.user.openId);
         if (!access.canModerate) throw new Error("Недостаточно прав для модерации лотов");
-        const group = await moderationService.moderateGroup(ctx.user.openId, input.groupId, input.action, input.reason);
+        const group = await db.moderateGroup(ctx.user.openId, input.groupId, input.action, input.reason);
         const ownerNotified = input.action !== "approve"
-          ? await telegramService.notifyCommunityRemovedFromTop({ openId: group.ownerOpenId, groupTitle: group.title, reason: input.reason })
+          ? await notifyCommunityRemovedFromTop({ openId: group.ownerOpenId, groupTitle: group.title, reason: input.reason })
           : false;
         return { success: true, ownerNotified } as const;
       }),
 
     getModerators: protectedProcedure.query(async ({ ctx }) => {
-      const access = await moderationService.getModerationAccess(ctx.user.openId);
+      const access = await db.getModerationAccess(ctx.user.openId);
       if (!access.canManageModerators) throw new Error("Недостаточно прав для управления модераторами");
-      return await moderationService.getModerators();
+      return await db.getModerators();
     }),
 
     setModeratorRole: protectedProcedure
       .input(z.object({ telegramUsername: z.string().trim().min(2).max(128), role: z.enum(["moderator", "user"]) }))
       .mutation(async ({ ctx, input }) => {
-        return await moderationService.setModeratorRole(ctx.user.openId, input.telegramUsername, input.role);
+        return await db.setModeratorRole(ctx.user.openId, input.telegramUsername, input.role);
       }),
 
     setPublicProfile: protectedProcedure
@@ -462,7 +462,7 @@ export const appRouter = router({
       .input(z.object({ groupId: z.number() }).merge(groupListingInput))
       .mutation(async ({ ctx, input }) => {
         const groups = await db.listGroupWithCredits(ctx.user.openId, input.groupId, input);
-        const deliveries = await Promise.all(groups.filter(group => group.listingAnnouncementEnabled).map(group => telegramService.notifyCommunityListed({
+        const deliveries = await Promise.all(groups.filter(group => group.listingAnnouncementEnabled).map(group => notifyCommunityListed({
           chatId: group.chatId,
           groupId: group.id,
           groupTitle: group.title,
@@ -477,7 +477,7 @@ export const appRouter = router({
       .input(z.object({ groupIds: z.array(z.number()).min(1).max(50) }).merge(groupListingInput))
       .mutation(async ({ ctx, input }) => {
         const groups = await db.listGroupsWithCredits(ctx.user.openId, input.groupIds, input);
-        const deliveries = await Promise.all(groups.filter(group => group.listingAnnouncementEnabled).map(group => telegramService.notifyCommunityListed({
+        const deliveries = await Promise.all(groups.filter(group => group.listingAnnouncementEnabled).map(group => notifyCommunityListed({
           chatId: group.chatId,
           groupId: group.id,
           groupTitle: group.title,
@@ -496,7 +496,7 @@ export const appRouter = router({
         if (group.category !== "Каналы" || group.username || !group.monthlyEntryEnabled || !group.monthlyEntryStars) {
           throw new Error("Ежемесячный вход доступен только для приватного канала с указанной ценой");
         }
-        const inviteLink = await telegramService.createTelegramMonthlySubscriptionInviteLink({
+        const inviteLink = await createTelegramMonthlySubscriptionInviteLink({
           chatId: group.chatId,
           starsAmount: group.monthlyEntryStars,
           linkName: group.monthlyEntryLinkName,
@@ -511,7 +511,7 @@ export const appRouter = router({
         const group = await db.getGroupById(input.groupId);
         if (!group || group.ownerOpenId !== ctx.user.openId) throw new Error("Сообщество недоступно для настройки");
         if (group.username) throw new Error("Закрытая ссылка доступна только для приватного сообщества без @username");
-        const inviteLink = await telegramService.createTelegramPrivateInviteLink({ chatId: group.chatId, linkName: "TG TOP private entry" });
+        const inviteLink = await createTelegramPrivateInviteLink({ chatId: group.chatId, linkName: "TG TOP private entry" });
         await db.savePrivateEntryInviteLink(ctx.user.openId, group.id, inviteLink);
         return { success: true, inviteLink };
       }),
@@ -521,11 +521,11 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const group = await db.getGroupById(input.groupId);
         if (!group) throw new Error("Сообщество не найдено");
-        const access = group.username ? { canModerate: false } : await moderationService.getModerationAccess(ctx.user.openId);
+        const access = group.username ? { canModerate: false } : await db.getModerationAccess(ctx.user.openId);
         if (!canResolveVerifiedEntryLink({ target: group, viewerOpenId: ctx.user.openId, canModerate: access.canModerate })) {
           throw new Error("Закрытая ссылка доступна только владельцу сообщества или модератору");
         }
-        const entryUrl = await telegramService.resolveVerifiedGroupEntryLink(group);
+        const entryUrl = await resolveVerifiedGroupEntryLink(group);
         return { entryUrl };
       }),
 
@@ -535,7 +535,7 @@ export const appRouter = router({
         const group = await db.getGroupById(input.groupId);
         if (!group || group.ownerOpenId === ctx.user.openId) throw new Error("Ссылка для приглашений недоступна");
         const result = await db.getOrCreateRewardInviteLink(input.groupId, ctx.user.openId, () =>
-          telegramService.createTelegramRewardInviteLink({
+          createTelegramRewardInviteLink({
             chatId: group.chatId,
             linkName: `TG TOP reward ${ctx.user.openId.replace(/^telegram:/, "").slice(-10)}`,
           })

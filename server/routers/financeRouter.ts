@@ -1,6 +1,5 @@
 import { z } from "zod";
 import * as db from "../db";
-import * as financeService from "../modules/finance";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getSafeTonDepositError } from "../tonDepositErrorPolicy";
 import { getSafeTonWithdrawalError } from "../tonWithdrawalErrorPolicy";
@@ -10,19 +9,19 @@ import { notifyTonDepositCredited } from "../telegramNotifications";
 
 export const financeProcedures = {
   getAccount: protectedProcedure.query(async ({ ctx }) => {
-    return await financeService.getAccountLedger(ctx.user.openId);
+    return await db.getAccountLedger(ctx.user.openId);
   }),
 
   getAccountActivity: protectedProcedure.query(async ({ ctx }) => {
-    return await financeService.getAccountActivity(ctx.user.openId);
+    return await db.getAccountActivity(ctx.user.openId);
   }),
 
   getTonDeposits: protectedProcedure.query(async ({ ctx }) => {
-    return await financeService.getTonDeposits(ctx.user.openId);
+    return await db.getTonDeposits(ctx.user.openId);
   }),
 
   getTonWithdrawalDefaultRecipient: protectedProcedure.query(async ({ ctx }) => {
-    return await financeService.getTonWithdrawalDefaultRecipient(ctx.user.openId);
+    return await db.getTonWithdrawalDefaultRecipient(ctx.user.openId);
   }),
 
   createTonDeposit: protectedProcedure
@@ -32,7 +31,7 @@ export const financeProcedures = {
     }))
     .mutation(async ({ ctx, input }) => {
       try {
-        return await financeService.createTonDeposit({
+        return await db.createTonDeposit({
           userOpenId: ctx.user.openId,
           amountTon: input.amountTon,
           senderWalletAddress: input.senderWalletAddress,
@@ -47,7 +46,7 @@ export const financeProcedures = {
     .input(z.object({ depositId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       try {
-        return await financeService.markTonDepositSubmitted({ userOpenId: ctx.user.openId, depositId: input.depositId });
+        return await db.markTonDepositSubmitted({ userOpenId: ctx.user.openId, depositId: input.depositId });
       } catch (error) {
         console.error("[TonDeposit] Could not mark deposit submitted:", error);
         throw new Error(getSafeTonDepositError(error));
@@ -58,7 +57,7 @@ export const financeProcedures = {
     .input(z.object({ depositId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       try {
-        const result = await financeService.verifyTonDeposit({ userOpenId: ctx.user.openId, depositId: input.depositId });
+        const result = await db.verifyTonDeposit({ userOpenId: ctx.user.openId, depositId: input.depositId });
         if (result.newlyConfirmed) {
           void notifyTonDepositCredited({ openId: ctx.user.openId, amountTon: result.amountTon });
           void deliverOperationsLog("finance", formatFinanceLog({
@@ -77,14 +76,14 @@ export const financeProcedures = {
     }),
 
   getTonWithdrawals: protectedProcedure.query(async ({ ctx }) => {
-    return await financeService.getTonWithdrawals(ctx.user.openId);
+    return await db.getTonWithdrawals(ctx.user.openId);
   }),
 
   quoteTonWithdrawal: protectedProcedure
     .input(z.object({ amountTon: z.string().trim().min(1).max(32), destinationWalletAddress: z.string().trim().min(32).max(96) }))
     .mutation(async ({ input }) => {
       try {
-        return await financeService.quoteTonWithdrawal(input);
+        return await db.quoteTonWithdrawal(input);
       } catch (error) {
         throw new Error(getSafeTonWithdrawalError(error));
       }
@@ -98,7 +97,7 @@ export const financeProcedures = {
     }))
     .mutation(async ({ ctx, input }) => {
       try {
-        const result = await financeService.createTonWithdrawal({ ...input, userOpenId: ctx.user.openId });
+        const result = await db.createTonWithdrawal({ ...input, userOpenId: ctx.user.openId });
         if (result.newlyCreated) {
           void deliverOperationsLog("finance", formatFinanceLog({
             event: "withdrawal_requested",
@@ -118,9 +117,27 @@ export const financeProcedures = {
     .input(z.object({ withdrawalId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       try {
-        return await financeService.enqueueTonWithdrawalReconciliation({ userOpenId: ctx.user.openId, withdrawalId: input.withdrawalId });
+        return await db.enqueueTonWithdrawalReconciliation({ userOpenId: ctx.user.openId, withdrawalId: input.withdrawalId });
       } catch (error) {
         console.error("[TonWithdrawal] Could not reconcile withdrawal:", error);
+        throw new Error(getSafeTonWithdrawalError(error));
+      }
+    }),
+
+  cancelTonWithdrawal: protectedProcedure
+    .input(z.object({ withdrawalId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const cancelled = await db.cancelQueuedTonWithdrawal({ userOpenId: ctx.user.openId, withdrawalId: input.withdrawalId });
+        void deliverOperationsLog("finance", formatFinanceLog({
+          event: "withdrawal_cancelled",
+          amount: `${(Number(cancelled.grossAmountNano) / 1_000_000_000).toFixed(2)} GRAM`,
+          actor: { name: ctx.user.name, username: ctx.user.telegramUsername },
+          reference: cancelled.reference,
+        }));
+        return cancelled;
+      } catch (error) {
+        console.error("[TonWithdrawal] Could not cancel withdrawal:", error);
         throw new Error(getSafeTonWithdrawalError(error));
       }
     }),
@@ -128,7 +145,7 @@ export const financeProcedures = {
   getTonWithdrawalsForManualReview: protectedProcedure.query(async ({ ctx }) => {
     const access = await db.getModerationAccess(ctx.user.openId);
     requireFinanceReviewer(access);
-    return await financeService.getTonWithdrawalsForManualReview();
+    return await db.getTonWithdrawalsForManualReview();
   }),
 
   reviewTonWithdrawal: protectedProcedure
@@ -137,7 +154,7 @@ export const financeProcedures = {
       const access = await db.getModerationAccess(ctx.user.openId);
       requireFinanceReviewer(access);
       try {
-        return await financeService.reviewTonWithdrawal({ ...input, reviewerOpenId: ctx.user.openId });
+        return await db.reviewTonWithdrawal({ ...input, reviewerOpenId: ctx.user.openId });
       } catch (error) {
         console.error("[TonWithdrawal] Could not review withdrawal:", error);
         throw new Error(getSafeTonWithdrawalError(error));

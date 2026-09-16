@@ -95,6 +95,13 @@ export class TonPayoutRejectedError extends Error {
   }
 }
 
+export class TonPayoutInsufficientFundsError extends Error {
+  constructor(message = "Недостаточно средств на горячем кошельке платформы для выплаты и комиссии") {
+    super(message);
+    this.name = "TonPayoutInsufficientFundsError";
+  }
+}
+
 export async function broadcastTonPayoutBoc(boc: string) {
   const response = await fetch("https://tonapi.io/v2/blockchain/message", {
     method: "POST",
@@ -123,7 +130,7 @@ export async function emulateTonPayoutFee(boc: string) {
     ?? payload.transactions?.[0]?.success;
   
   if (success === false) {
-    throw new Error("Транзакция завершится ошибкой (вероятно, недостаточно средств на горячем кошельке)");
+    throw new TonPayoutInsufficientFundsError("Транзакция не может быть выполнена: недостаточно средств на горячем кошельке платформы");
   }
 
   const value = payload.transaction?.total_fees

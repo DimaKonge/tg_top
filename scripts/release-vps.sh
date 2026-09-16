@@ -40,8 +40,8 @@ if [[ "$DRY_RUN" == "1" ]]; then
 fi
 
 export SSHPASS="$PASSWORD"
-SSH=(sshpass -e ssh -o BatchMode=no -o StrictHostKeyChecking=accept-new "$HOST")
-SCP=(sshpass -e scp -o StrictHostKeyChecking=accept-new)
+SSH=(sshpass -e ssh -o BatchMode=no -o StrictHostKeyChecking=yes "$HOST")
+SCP=(sshpass -e scp -o StrictHostKeyChecking=yes)
 
 "${SSH[@]}" 'mkdir -p /opt/tgtop/releases'
 "${SCP[@]}" "$ARCHIVE" "$HOST:/opt/tgtop/releases/${RELEASE}-source.tgz"

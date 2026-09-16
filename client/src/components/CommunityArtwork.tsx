@@ -50,17 +50,14 @@ export function CommunityAvatar({
   const [videoFailed, setVideoFailed] = useState(false);
   const { candidates, candidateIndex, setCandidateIndex, imageLoaded, setImageLoaded } = useGroupAvatarInfo(group);
   const avatarSrc = candidates[candidateIndex] || null;
-  const size = hero ? "h-32 w-32" : large ? "h-16 w-16" : compact ? "h-12 w-12" : "h-11 w-11";
   return (
-    <span className={`${size} relative grid shrink-0 place-items-center overflow-hidden rounded-xl border border-white/10 bg-[#1b2430] text-sm font-semibold text-slate-200`}>
+    <span className={`${""} grid shrink-0 place-items-center overflow-hidden rounded-xl border border-white/10 bg-[#1b2430] text-sm font-semibold text-slate-200`}>
       {allowAnimatedMedia && group.animatedAvatarUrl && !videoFailed ? (
         <video key={group.animatedAvatarUrl} src={group.animatedAvatarUrl} poster={avatarSrc ?? undefined} muted loop autoPlay playsInline preload="metadata" disablePictureInPicture className="h-full w-full object-cover" onLoadedData={event => { void event.currentTarget.play().catch(() => undefined); }} onError={() => setVideoFailed(true)} />
-      ) : avatarSrc ? (
+      ) : avatarSrc && !false ? (
         <img src={avatarSrc} alt="" onError={() => setCandidateIndex(prev => prev + 1)} onLoad={() => setImageLoaded(true)} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${imageLoaded ? "opacity-100" : "opacity-0"}`} />
       ) : (
-        <span className="grid h-full w-full place-items-center bg-[radial-gradient(circle_at_35%_22%,#254e7a_0%,#111720_70%)]">
-          <TgTopAnimatedPyramidAvatar className="h-[62%] w-[62%]" title="TG TOP" />
-        </span>
+        <TgTopAnimatedPyramidAvatar className="h-[62%] w-[62%]" title="TG TOP" />
       )}
     </span>
   );

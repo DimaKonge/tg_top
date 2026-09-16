@@ -733,6 +733,31 @@ export async function enqueueTonWithdrawalReconciliation(input: { userOpenId: st
   return toTonWithdrawalView(withdrawal);
 }
 
+export async function cancelQueuedTonWithdrawal(input: { userOpenId: string; withdrawalId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  let updatedWithdrawal: typeof tonWithdrawals.$inferSelect | undefined;
+  await db.transaction(async tx => {
+    const withdrawal = (await tx.select().from(tonWithdrawals).where(and(eq(tonWithdrawals.id, input.withdrawalId), eq(tonWithdrawals.userOpenId, input.userOpenId))).limit(1))[0];
+    if (!withdrawal) throw new Error("Заявка на вывод не найдена");
+    if (withdrawal.status !== "queued" && withdrawal.status !== "manual_review") {
+      throw new Error("Заявку на этом этапе нельзя отменить автоматически, так как она уже передана в сеть");
+    }
+    const grossTon = formatWithdrawalNanoTon(BigInt(withdrawal.grossAmountNano));
+    const cancelled = await tx.update(tonWithdrawals).set({
+      status: "cancelled",
+      failureReason: "Отменено пользователем; GRAM возвращён на баланс",
+    }).where(and(eq(tonWithdrawals.id, withdrawal.id), inArray(tonWithdrawals.status, ["queued", "manual_review"])));
+    if (Number(cancelled[0]?.affectedRows ?? 0) === 1) {
+      await tx.update(users).set({ mainBalanceTon: sql`${users.mainBalanceTon} + ${grossTon}` }).where(eq(users.openId, input.userOpenId));
+      await tx.delete(tonPayoutJobs).where(eq(tonPayoutJobs.withdrawalId, withdrawal.id));
+    }
+    updatedWithdrawal = (await tx.select().from(tonWithdrawals).where(eq(tonWithdrawals.id, withdrawal.id)).limit(1))[0];
+  });
+  if (!updatedWithdrawal) throw new Error("Не удалось отменить заявку");
+  return toTonWithdrawalView(updatedWithdrawal);
+}
+
 export async function enqueueTonPayoutJob(withdrawalId: number, kind: TonPayoutJobKind) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -818,17 +843,19 @@ export async function quoteTonWithdrawal(input: { amountTon: string; destination
 }
 
 export async function createTonWithdrawal(input: { userOpenId: string; amountTon: string; destinationWalletAddress: string; idempotencyKey: string }) {
-  if (!isTonWithdrawalAutomationEnabled()) throw new Error("Вывод временно приостановлен до завершения проверки защищённой очереди");
+  if (process.env.TON_WITHDRAWALS_PAUSED === "true") {
+    throw new Error("Вывод временно приостановлен администратором");
+  }
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const quote = getTonWithdrawalQuote(input.amountTon);
   const destinationWalletAddress = normalizeTonAddress(input.destinationWalletAddress);
   const payoutWalletAddress = await getConfiguredTonPayoutWalletAddress();
-  if (destinationWalletAddress === payoutWalletAddress) throw new Error("Адрес получателя не может совпадать с горячим кошельком выплат");
+  if (process.env.TON_PAYOUT_WALLET_ADDRESS && destinationWalletAddress === payoutWalletAddress) {
+    throw new Error("Адрес получателя не может совпадать с горячим кошельком выплат");
+  }
   const existing = (await db.select().from(tonWithdrawals).where(and(eq(tonWithdrawals.userOpenId, input.userOpenId), eq(tonWithdrawals.idempotencyKey, input.idempotencyKey))).limit(1))[0];
   if (existing) return { ...toTonWithdrawalView(existing), newlyCreated: false };
-  const active = (await db.select().from(tonWithdrawals).where(and(eq(tonWithdrawals.userOpenId, input.userOpenId), inArray(tonWithdrawals.status, ["queued", "manual_review", "broadcast_pending", "sent"]))).orderBy(desc(tonWithdrawals.createdAt), desc(tonWithdrawals.id)).limit(1))[0];
-  if (active) return { ...toTonWithdrawalView(active), newlyCreated: false };
 
   const now = new Date();
   const [priorDestination, userHour, addressRecent, userDay, globalMinute] = await Promise.all([
@@ -858,11 +885,6 @@ export async function createTonWithdrawal(input: { userOpenId: string; amountTon
       created = duplicate;
       return;
     }
-    const activeInTransaction = (await tx.select().from(tonWithdrawals).where(and(eq(tonWithdrawals.userOpenId, input.userOpenId), inArray(tonWithdrawals.status, ["queued", "manual_review", "broadcast_pending", "sent"]))).orderBy(desc(tonWithdrawals.createdAt), desc(tonWithdrawals.id)).limit(1))[0];
-    if (activeInTransaction) {
-      created = activeInTransaction;
-      return;
-    }
     const debit = await tx.update(users).set({ mainBalanceTon: sql`${users.mainBalanceTon} - ${grossTon}` }).where(and(eq(users.openId, input.userOpenId), gte(users.mainBalanceTon, grossTon)));
     if (Number(debit[0]?.affectedRows ?? 0) !== 1) throw new Error("Недостаточно основного GRAM-баланса для вывода");
     const result = await tx.insert(tonWithdrawals).values({
@@ -874,12 +896,12 @@ export async function createTonWithdrawal(input: { userOpenId: string; amountTon
       netAmountNano: quote.netAmountNano.toString(),
       idempotencyKey: input.idempotencyKey,
       reference,
-      status: risk.status,
-      riskReasons: risk.reasons.join(",") || null,
+      status: isTonWithdrawalAutomationEnabled() ? risk.status : "manual_review",
+      riskReasons: isTonWithdrawalAutomationEnabled() ? (risk.reasons.join(",") || null) : ([...risk.reasons, "fee_preflight"].join(",") || "fee_preflight"),
     });
     created = (await tx.select().from(tonWithdrawals).where(eq(tonWithdrawals.id, Number(result[0]?.insertId ?? 0))).limit(1))[0];
     newlyCreated = Boolean(created);
-    if (created?.status === "queued") {
+    if (created?.status === "queued" && isTonWithdrawalAutomationEnabled()) {
       await tx.insert(tonPayoutJobs).values({ withdrawalId: created.id, kind: "broadcast" });
     }
   });
@@ -1404,7 +1426,7 @@ function getRankingRewardBudgetAdjustment(group: typeof groupsCatalog.$inferSele
   };
 }
 
-export type RankingCreditDebit = {
+type RankingCreditDebit = {
   spendUnits: number;
   reservedRewardBudget: number;
   releasedRewardBudget: number;
@@ -3210,15 +3232,8 @@ export async function unlistGroups(ownerOpenId: string, groupIds: number[]) {
 
 function enrichNftRow<T extends typeof nftUsernames.$inferSelect>(nft: T) {
   const meta = tryParseNftMetadata(nft.ownershipVerification);
-  const isGift = nft.username.toLowerCase().includes("gift") || meta?.category === "gifts";
-  const isNumber = nft.username.startsWith("+") || meta?.category === "anonymous_numbers";
-  const category = meta?.category || (isGift ? "gifts" : isNumber ? "anonymous_numbers" : "usernames");
   return {
     ...nft,
-    category,
-    imageUrl: meta?.imageUrl ?? null,
-    collectionName: meta?.collectionName ?? null,
-    bidAmount: meta?.bidAmount ?? Number(nft.priceAmount) ?? 50,
     vaultAddress: meta?.vaultAddress || getNftVaultAddress(nft.username, nft.id),
     installmentsAvailable: Boolean(meta?.installments),
     installmentsDownPayment: meta?.installments?.downPayment ?? null,
@@ -3228,324 +3243,16 @@ function enrichNftRow<T extends typeof nftUsernames.$inferSelect>(nft: T) {
   };
 }
 
-const DEFAULT_STARTER_NFTS = [
-  {
-    id: 1,
-    username: "Durov",
-    price: "5000 TON",
-    priceAmount: 5000,
-    rentalPricePerDay: "15 TON",
-    rentalAmountPerDay: 15,
-    minRentalDays: 7,
-    maxRentalDays: 365,
-    ownerOpenId: "system-starter",
-    ownerUsername: "durov",
-    assetClass: "offchain" as const,
-    listingType: "both" as const,
-    status: "available" as const,
-    nftItemAddress: "EQDurov_Fragment_Top_Leader_001",
-    ownerWalletAddress: null,
-    ownershipVerifiedAt: new Date(),
-    ownershipVerification: JSON.stringify({
-      category: "usernames",
-      bidAmount: 5000,
-      modes: ["sale", "rent"],
-    }),
-    showcaseGroupId: null,
-    showcaseProfile: false,
-    currentRenterOpenId: null,
-    rentalExpiresAt: null,
-    createdAt: new Date(),
-  },
-  {
-    id: 2,
-    username: "Plush Pepe #1402",
-    price: "1250 TON",
-    priceAmount: 1250,
-    rentalPricePerDay: "5 TON",
-    rentalAmountPerDay: 5,
-    minRentalDays: 7,
-    maxRentalDays: 180,
-    ownerOpenId: "system-starter",
-    ownerUsername: "pepe_vault",
-    assetClass: "offchain" as const,
-    listingType: "both" as const,
-    status: "available" as const,
-    nftItemAddress: "EQPepe_Gifts_Ton_Star_002",
-    ownerWalletAddress: null,
-    ownershipVerifiedAt: new Date(),
-    ownershipVerification: JSON.stringify({
-      category: "gifts",
-      bidAmount: 1250,
-      collectionName: "Telegram Gifts",
-      modes: ["sale", "rent"],
-    }),
-    showcaseGroupId: null,
-    showcaseProfile: false,
-    currentRenterOpenId: null,
-    rentalExpiresAt: null,
-    createdAt: new Date(),
-  },
-  {
-    id: 3,
-    username: "+888 0777 0001",
-    price: "850 TON",
-    priceAmount: 850,
-    rentalPricePerDay: "3 TON",
-    rentalAmountPerDay: 3,
-    minRentalDays: 14,
-    maxRentalDays: 365,
-    ownerOpenId: "system-starter",
-    ownerUsername: "ton_whale",
-    assetClass: "offchain" as const,
-    listingType: "both" as const,
-    status: "available" as const,
-    nftItemAddress: "EQAnon_888_VIP_003",
-    ownerWalletAddress: null,
-    ownershipVerifiedAt: new Date(),
-    ownershipVerification: JSON.stringify({
-      category: "anonymous_numbers",
-      bidAmount: 850,
-      modes: ["sale", "rent"],
-    }),
-    showcaseGroupId: null,
-    showcaseProfile: false,
-    currentRenterOpenId: null,
-    rentalExpiresAt: null,
-    createdAt: new Date(),
-  },
-  {
-    id: 4,
-    username: "Snoop Dogg #420",
-    price: "450 TON",
-    priceAmount: 450,
-    rentalPricePerDay: "2 TON",
-    rentalAmountPerDay: 2,
-    minRentalDays: 7,
-    maxRentalDays: 90,
-    ownerOpenId: "system-starter",
-    ownerUsername: "cali_ton",
-    assetClass: "offchain" as const,
-    listingType: "both" as const,
-    status: "available" as const,
-    nftItemAddress: "EQSnoop_Gifts_Ton_004",
-    ownerWalletAddress: null,
-    ownershipVerifiedAt: new Date(),
-    ownershipVerification: JSON.stringify({
-      category: "gifts",
-      bidAmount: 450,
-      collectionName: "Telegram Gifts",
-      modes: ["sale", "rent"],
-    }),
-    showcaseGroupId: null,
-    showcaseProfile: false,
-    currentRenterOpenId: null,
-    rentalExpiresAt: null,
-    createdAt: new Date(),
-  },
-  {
-    id: 5,
-    username: "crypto",
-    price: "390 TON",
-    priceAmount: 390,
-    rentalPricePerDay: "1.5 TON",
-    rentalAmountPerDay: 2,
-    minRentalDays: 7,
-    maxRentalDays: 365,
-    ownerOpenId: "system-starter",
-    ownerUsername: "satoshi_ton",
-    assetClass: "offchain" as const,
-    listingType: "both" as const,
-    status: "available" as const,
-    nftItemAddress: "EQCrypto_Fragment_005",
-    ownerWalletAddress: null,
-    ownershipVerifiedAt: new Date(),
-    ownershipVerification: JSON.stringify({
-      category: "usernames",
-      bidAmount: 390,
-      modes: ["sale", "rent"],
-    }),
-    showcaseGroupId: null,
-    showcaseProfile: false,
-    currentRenterOpenId: null,
-    rentalExpiresAt: null,
-    createdAt: new Date(),
-  },
-  {
-    id: 6,
-    username: "Santa Hat #999",
-    price: "280 TON",
-    priceAmount: 280,
-    rentalPricePerDay: "1 TON",
-    rentalAmountPerDay: 1,
-    minRentalDays: 7,
-    maxRentalDays: 60,
-    ownerOpenId: "system-starter",
-    ownerUsername: "holiday_club",
-    assetClass: "offchain" as const,
-    listingType: "both" as const,
-    status: "available" as const,
-    nftItemAddress: "EQSanta_Gifts_Ton_006",
-    ownerWalletAddress: null,
-    ownershipVerifiedAt: new Date(),
-    ownershipVerification: JSON.stringify({
-      category: "gifts",
-      bidAmount: 280,
-      collectionName: "Telegram Gifts",
-      modes: ["sale", "rent"],
-    }),
-    showcaseGroupId: null,
-    showcaseProfile: false,
-    currentRenterOpenId: null,
-    rentalExpiresAt: null,
-    createdAt: new Date(),
-  },
-  {
-    id: 7,
-    username: "top",
-    price: "250 TON",
-    priceAmount: 250,
-    rentalPricePerDay: "1 TON",
-    rentalAmountPerDay: 1,
-    minRentalDays: 7,
-    maxRentalDays: 180,
-    ownerOpenId: "system-starter",
-    ownerUsername: "admin",
-    assetClass: "offchain" as const,
-    listingType: "both" as const,
-    status: "available" as const,
-    nftItemAddress: "EQTop_Fragment_007",
-    ownerWalletAddress: null,
-    ownershipVerifiedAt: new Date(),
-    ownershipVerification: JSON.stringify({
-      category: "usernames",
-      bidAmount: 250,
-      modes: ["sale", "rent"],
-    }),
-    showcaseGroupId: null,
-    showcaseProfile: false,
-    currentRenterOpenId: null,
-    rentalExpiresAt: null,
-    createdAt: new Date(),
-  },
-  {
-    id: 8,
-    username: "+888 0555 7777",
-    price: "180 TON",
-    priceAmount: 180,
-    rentalPricePerDay: "0.8 TON",
-    rentalAmountPerDay: 1,
-    minRentalDays: 7,
-    maxRentalDays: 180,
-    ownerOpenId: "system-starter",
-    ownerUsername: "lucky_trader",
-    assetClass: "offchain" as const,
-    listingType: "both" as const,
-    status: "available" as const,
-    nftItemAddress: "EQAnon_888_008",
-    ownerWalletAddress: null,
-    ownershipVerifiedAt: new Date(),
-    ownershipVerification: JSON.stringify({
-      category: "anonymous_numbers",
-      bidAmount: 180,
-      modes: ["sale", "rent"],
-    }),
-    showcaseGroupId: null,
-    showcaseProfile: false,
-    currentRenterOpenId: null,
-    rentalExpiresAt: null,
-    createdAt: new Date(),
-  },
-  {
-    id: 9,
-    username: "vip",
-    price: "150 TON",
-    priceAmount: 150,
-    rentalPricePerDay: "0.5 TON",
-    rentalAmountPerDay: 1,
-    minRentalDays: 7,
-    maxRentalDays: 90,
-    ownerOpenId: "system-starter",
-    ownerUsername: "vip_ton",
-    assetClass: "offchain" as const,
-    listingType: "both" as const,
-    status: "available" as const,
-    nftItemAddress: "EQVip_Fragment_009",
-    ownerWalletAddress: null,
-    ownershipVerifiedAt: new Date(),
-    ownershipVerification: JSON.stringify({
-      category: "usernames",
-      bidAmount: 150,
-      modes: ["sale", "rent"],
-    }),
-    showcaseGroupId: null,
-    showcaseProfile: false,
-    currentRenterOpenId: null,
-    rentalExpiresAt: null,
-    createdAt: new Date(),
-  },
-  {
-    id: 10,
-    username: "Gold Star #77",
-    price: "120 TON",
-    priceAmount: 120,
-    rentalPricePerDay: "0.5 TON",
-    rentalAmountPerDay: 1,
-    minRentalDays: 7,
-    maxRentalDays: 90,
-    ownerOpenId: "system-starter",
-    ownerUsername: "ton_star",
-    assetClass: "offchain" as const,
-    listingType: "both" as const,
-    status: "available" as const,
-    nftItemAddress: "EQGoldStar_Gifts_010",
-    ownerWalletAddress: null,
-    ownershipVerifiedAt: new Date(),
-    ownershipVerification: JSON.stringify({
-      category: "gifts",
-      bidAmount: 120,
-      collectionName: "Telegram Gifts",
-      modes: ["sale", "rent"],
-    }),
-    showcaseGroupId: null,
-    showcaseProfile: false,
-    currentRenterOpenId: null,
-    rentalExpiresAt: null,
-    createdAt: new Date(),
-  },
-];
-
 export async function getNftUsernames(ownerOpenId?: string) {
   const db = await getDb();
-  if (!db) {
-    if (ownerOpenId) return [];
-    return DEFAULT_STARTER_NFTS.map(enrichNftRow);
-  }
+  if (!db) return [];
   if (ownerOpenId) {
     const rows = await db.select().from(nftUsernames).where(eq(nftUsernames.ownerOpenId, ownerOpenId)).orderBy(desc(nftUsernames.createdAt));
     return rows.map(enrichNftRow);
   }
-  let rows = await db.select().from(nftUsernames).where(eq(nftUsernames.status, "available")).orderBy(desc(nftUsernames.priceAmount));
-  if (rows.length < DEFAULT_STARTER_NFTS.length) {
-    try {
-      const existingUsernames = new Set(rows.map(r => r.username.toLowerCase()));
-      for (const item of DEFAULT_STARTER_NFTS) {
-        if (!existingUsernames.has(item.username.toLowerCase())) {
-          const { id: _id, ...values } = item;
-          await db.insert(nftUsernames).values(values).onDuplicateKeyUpdate({ set: { status: "available" } });
-        }
-      }
-      rows = await db.select().from(nftUsernames).where(eq(nftUsernames.status, "available")).orderBy(desc(nftUsernames.priceAmount));
-    } catch {
-      // ignore duplicate or race errors
-    }
-  }
-  if (rows.length === 0) {
-    return DEFAULT_STARTER_NFTS.map(enrichNftRow);
-  }
+  const rows = await db.select().from(nftUsernames).where(eq(nftUsernames.status, "available")).orderBy(desc(nftUsernames.createdAt));
   return rows
     .filter(nft => canPublishNftListing({ assetClass: nft.assetClass, ownershipVerifiedAt: nft.ownershipVerifiedAt }))
-    .sort((a, b) => (b.priceAmount || 0) - (a.priceAmount || 0))
     .map(enrichNftRow);
 }
 

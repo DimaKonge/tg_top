@@ -66,9 +66,14 @@ queryClient.getQueryCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.query.state.error;
     redirectToLoginIfUnauthorized(error);
-    // Don't flood console with expected background retries or offline states
+    // Suppress network disconnection noise during offline/page-switch events
     if (event.query.state.status === "error") {
-      console.error("[API Query Error]", error);
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("Failed to fetch") && !message.includes("NetworkError") && !message.includes("Load failed")) {
+        console.error("[API Query Error]", error);
+      } else {
+        console.warn("[API Query Network Disconnection]", message);
+      }
     }
   }
 });
@@ -77,7 +82,12 @@ queryClient.getMutationCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
     const error = event.mutation.state.error;
     redirectToLoginIfUnauthorized(error);
-    console.error("[API Mutation Error]", error);
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes("Failed to fetch") && !message.includes("NetworkError") && !message.includes("Load failed")) {
+      console.error("[API Mutation Error]", error);
+    } else {
+      console.warn("[API Mutation Network Disconnection]", message);
+    }
   }
 });
 

@@ -253,6 +253,39 @@ async function startServer() {
         console.warn("[Boot] Automatic slot deduplication skipped:", err);
       }
     })();
+
+    // Start background TON payout worker in-process if configured
+    if (process.env.TON_PAYOUT_QUEUE_ENABLED === "true") {
+      void (async () => {
+        try {
+          const { createTonPayoutWorkerId, runTonPayoutWorkerTick } = await import("../tonPayoutWorker");
+          const workerId = createTonPayoutWorkerId();
+          let running = false;
+          let stopping = false;
+          const tick = async () => {
+            if (running || stopping) return;
+            running = true;
+            try {
+              await runTonPayoutWorkerTick(workerId);
+            } catch (error) {
+              console.error("[TonPayoutWorker] Tick failed", error instanceof Error ? error.message : "unknown_error");
+            } finally {
+              running = false;
+            }
+          };
+          process.once("SIGTERM", () => { stopping = true; });
+          process.once("SIGINT", () => { stopping = true; });
+          console.log("[TonPayoutWorker] In-process worker started", {
+            workerId,
+            broadcastEnabled: process.env.TON_PAYOUT_WORKER_BROADCAST_ENABLED === "true",
+          });
+          void tick();
+          setInterval(() => void tick(), 2000).unref();
+        } catch (err) {
+          console.warn("[TonPayoutWorker] In-process worker initialization skipped:", err);
+        }
+      })();
+    }
   });
 
   const handleShutdown = (signal: string) => {

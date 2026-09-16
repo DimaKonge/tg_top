@@ -15,7 +15,7 @@ describe("TopRankingCard", () => {
   it("keeps lightweight media behaviour with a static fallback", () => {
     expect(source).toContain('preload="metadata"');
     expect(source).toContain('onError={() => setVideoFailed(true)}');
-    expect(source).toContain('setCandidateIndex');
+    expect(source).toContain('onError={() => setImageFailed(true)}');
     expect(source).toContain('<TgTopAnimatedPyramidAvatar');
   });
 

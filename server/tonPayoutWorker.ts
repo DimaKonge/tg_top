@@ -14,7 +14,7 @@ import {
   sendTonPayoutJobToManualReview,
 } from "./db";
 import { formatNanoTon } from "./tonDeposits";
-import { buildTonPayoutExternalBoc, broadcastTonPayoutBoc, emulateTonPayoutFee, TonPayoutRejectedError } from "./tonPayoutWallet";
+import { buildTonPayoutExternalBoc, broadcastTonPayoutBoc, emulateTonPayoutFee, TonPayoutRejectedError, TonPayoutInsufficientFundsError } from "./tonPayoutWallet";
 import { getConfiguredTonPayoutWalletAddress } from "./tonPayoutConfig";
 import { deliverOperationsLog, formatFinanceLog } from "./telegramOperationsLogger";
 
@@ -43,7 +43,7 @@ async function getFeeWithBoundedRetry(boc: string) {
   throw lastError;
 }
 
-async function cancelQueuedWithdrawalForFeeFailure(withdrawalId: number, userOpenId: string, grossAmountNano: bigint) {
+async function cancelQueuedWithdrawalForFeeFailure(withdrawalId: number, userOpenId: string, grossAmountNano: bigint, reason = "Отмена: комиссию сети нельзя безопасно рассчитать") {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const grossTon = formatNanoTon(grossAmountNano);
@@ -51,7 +51,7 @@ async function cancelQueuedWithdrawalForFeeFailure(withdrawalId: number, userOpe
     const cancelled = await tx.update(tonWithdrawals).set({
       status: "cancelled",
       riskReasons: sql`concat_ws(',', ${tonWithdrawals.riskReasons}, 'fee_preflight')`,
-      failureReason: "Отмена: комиссию сети нельзя безопасно рассчитать",
+      failureReason: reason,
     }).where(and(eq(tonWithdrawals.id, withdrawalId), eq(tonWithdrawals.status, "queued")));
     if (Number(cancelled[0]?.affectedRows ?? 0) === 1) {
       await tx.update(users).set({ mainBalanceTon: sql`${users.mainBalanceTon} + ${grossTon}` }).where(eq(users.openId, userOpenId));
@@ -114,8 +114,13 @@ async function processBroadcastJob(job: NonNullable<Awaited<ReturnType<typeof cl
         prepared = await buildTonPayoutExternalBoc({ destinationWalletAddress: withdrawal.destinationWalletAddress, amountNano: finalNetNano, reference: withdrawal.reference });
       }
     } catch (error) {
+      if (error instanceof TonPayoutInsufficientFundsError) {
+        await cancelQueuedWithdrawalForFeeFailure(withdrawal.id, withdrawal.userOpenId, grossAmountNano, error.message);
+        await completeTonPayoutJob(job.id, job.leaseToken);
+        return;
+      }
       if (error instanceof Error && error.message === "fee_exceeds_amount") {
-        await cancelQueuedWithdrawalForFeeFailure(withdrawal.id, withdrawal.userOpenId, grossAmountNano);
+        await cancelQueuedWithdrawalForFeeFailure(withdrawal.id, withdrawal.userOpenId, grossAmountNano, "Сумма меньше минимальной комиссии сети; GRAM возвращён");
         await completeTonPayoutJob(job.id, job.leaseToken);
         return;
       }

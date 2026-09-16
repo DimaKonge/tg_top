@@ -63,10 +63,6 @@ export interface NftItemMetadata {
   };
   modes?: string[];
   verification?: string;
-  category?: string;
-  imageUrl?: string | null;
-  collectionName?: string | null;
-  bidAmount?: number;
 }
 
 export function tryParseNftMetadata(verification: string | null | undefined): NftItemMetadata | null {

@@ -13,6 +13,7 @@ import {
   recordGroupSnapshot,
   awardTelegramReward,
   observeProtectedGroupTransfer,
+  approveStarsRankingPayment,
   claimTelegramEvent,
   consumeTelegramOnboardingIntent,
   flagGroupForModeration,
@@ -30,11 +31,11 @@ import {
   linkTelegramSupportOwnerNotification,
   recordVerifiedPublicUsername,
   saveTelegramOperationLogDestination,
+  settleStarsRankingPayment,
   saveTelegramOperationsOwnerBinding,
   upsertTelegramGroup,
   upsertUser,
 } from "./db";
-import { approveStarsRankingPayment, settleStarsRankingPayment } from "./modules/auction";
 import { notifyCommunityEntryLinkInvalidated, notifyCommunityEntryLinkRevalidated, notifyRankingOutbid } from "./telegramNotifications";
 import { ENV } from "./_core/env";
 import { deliverOperationsLog, formatAdditionLog, formatLaunchLog, formatTopActivityLog } from "./telegramOperationsLogger";

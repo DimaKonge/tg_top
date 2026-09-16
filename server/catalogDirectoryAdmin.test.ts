@@ -6,7 +6,6 @@ describe("catalog directory administration", () => {
     const dbSource = readFileSync(new URL("./db.ts", import.meta.url), "utf8");
     const routerSource = readFileSync(new URL("./routers.ts", import.meta.url), "utf8");
     const homeSource = readFileSync(new URL("../client/src/pages/Home.tsx", import.meta.url), "utf8");
-    const botCategorySheetSource = readFileSync(new URL("../client/src/components/bots/BotCategorySheet.tsx", import.meta.url), "utf8");
 
     expect(dbSource).toContain("export async function getCatalogTaxonomy()");
     expect(dbSource).toContain("if (!access.canModerate) throw new Error(\"Недостаточно прав для управления справочниками\")");
@@ -22,7 +21,7 @@ describe("catalog directory administration", () => {
     expect(homeSource).toContain("Все пользователи с доступом к админ-панели могут менять эти списки.");
     expect(homeSource).toContain("const managedCountries = catalogTaxonomy?.countries?.length");
     expect(homeSource).toContain('category: "Каналы" | "Чаты" | "Боты"');
-    expect(botCategorySheetSource).toContain('Рубрика ботов');
+    expect(homeSource).toContain('Рубрика ботов');
     expect(homeSource).toContain('setBotCategorySheetOpen(true)');
   });
 });

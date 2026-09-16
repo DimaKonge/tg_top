@@ -60,10 +60,6 @@ export type Nft = {
   installmentsPeriodDays?: number | null;
   installmentsTotalPrice?: string | null;
   modes?: string[];
-  category?: string | null;
-  imageUrl?: string | null;
-  collectionName?: string | null;
-  bidAmount?: number | null;
 };
 export type ShowcaseNft = Pick<Nft, "id" | "username" | "price" | "rentalPricePerDay" | "assetClass" | "listingType">;
 export type WalletNft = { address: string; index: number; name: string; description: string | null; imageUrl: string | null; imageUrls: string[]; mediaKind: "video" | "image" | null; collectionName: string | null; collectionAddress: string | null; category: Exclude<WalletNftFilter, "all"> };

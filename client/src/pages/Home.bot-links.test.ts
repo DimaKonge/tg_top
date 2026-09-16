@@ -191,9 +191,12 @@ describe("TG TOP production bot links", () => {
     expect(source).toContain('["communities", tx("Сообщества", "Communities")]');
     expect(source).toContain('["bots", tx("Боты", "Bots")]');
     expect(source).toContain('topSection === "nft"');
-    expect(source).toContain('NftRankingTile');
+    expect(source).toContain('<NftCard');
+    expect(source).toContain('["onchain", "On-chain"]');
+    expect(source).toContain('["offchain", "Off-chain"]');
     expect(source).toContain('prepareNftTransfer');
     expect(source).not.toContain('completeOffchainNftTransfer');
+    expect(source).toContain('Заявка на передачу');
     expect(source).toContain('group.title.slice(0, 1).toUpperCase()');
     expect(source).not.toContain('accept="video/mp4"');
     expect(source).not.toContain('uploadSelectedAnimatedAvatar');
@@ -287,6 +290,9 @@ describe("TG TOP production bot links", () => {
     expect(source).toContain('Оплата подтверждена Telegram. Позиция обновляется…');
     const showcaseSource = readFileSync(new URL("../components/tgtop/NftShowcase.tsx", import.meta.url), "utf8");
     expect(showcaseSource).toContain("export function NftShowcase");
+    expect(source).toContain('NFT-витрина площадки');
+    expect(source).toContain('NFT-витрина владельца');
+    expect(source).toContain('Моя NFT-витрина');
     expect(source).toContain('setNftShowcase.mutate');
     expect(source).toContain('get("listing")');
     expect(source).toContain('setPage("details")');
@@ -551,6 +557,11 @@ describe("TG TOP production bot links", () => {
     expect(source).toContain('Пригласили');
     expect(source).not.toContain('по ссылкам бота');
     expect(source).toContain("{formatCatalogNumber(group.membersCount, language)} {language === \"en\" ? \"members\" : \"участников\"} · +{formatCatalogNumber(group.joinedCount, language)}");
+    expect(source).toContain('tx("Гифты", "Gifts")');
+    expect(source).toContain('detail?.group.monthlyEntryInviteLink\n    ?? detail?.group.inviteLink\n    ?? null');
+    expect(source).not.toContain('(detail?.group.username ? `https://t.me/${detail.group.username}` : null)');
+    expect(source).toContain('tx("Анонимные номера", "Anonymous numbers")');
+    expect(source).toContain('tx("Другие NFT", "Other NFTs")');
     expect(source).toContain('setNftMarketCategory(value)');
     expect(source).toContain('`${nft.username} ${nft.ownerUsername}`.toLowerCase().includes(query)');
     expect(source).toContain('!topSearchQuery.trim() && <div key={rankingMotionKey}');

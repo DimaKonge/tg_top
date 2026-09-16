@@ -18,6 +18,7 @@ describe("NFT ownership truthfulness", () => {
     expect(dbSource).not.toContain("export async function completeOffchainNftTransfer(");
     expect(routerSource).not.toContain("completeOffchainNftTransfer: protectedProcedure");
     expect(homeSource).not.toContain("completeOffchainNftTransferMutation");
+    expect(homeSource).toContain("Заявка на передачу");
     expect(homeSource).toContain("не передает NFT автоматически");
   });
 });

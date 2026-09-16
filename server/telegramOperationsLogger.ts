@@ -37,12 +37,13 @@ export function formatAdditionLog(input: { groupTitle: string; groupId: number; 
   ].join("\n");
 }
 
-export function formatFinanceLog(input: { event: "deposit_confirmed" | "withdrawal_requested" | "withdrawal_sent" | "withdrawal_confirmed"; amount: string; actor?: { name?: string | null; username?: string | null }; reference: string; transactionHash?: string | null }) {
+export function formatFinanceLog(input: { event: "deposit_confirmed" | "withdrawal_requested" | "withdrawal_sent" | "withdrawal_confirmed" | "withdrawal_cancelled"; amount: string; actor?: { name?: string | null; username?: string | null }; reference: string; transactionHash?: string | null }) {
   const headlines: Record<typeof input.event, string> = {
     deposit_confirmed: "✅ Подтверждено пополнение TG TOP",
     withdrawal_requested: "📝 Создана заявка на вывод",
     withdrawal_sent: "📤 Вывод отправлен в сеть",
     withdrawal_confirmed: "✅ Вывод подтверждён сетью",
+    withdrawal_cancelled: "❌ Заявка на вывод отменена",
   };
   return [
     headlines[input.event],
