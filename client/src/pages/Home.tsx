@@ -2709,7 +2709,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                         <X className="h-3.5 w-3.5" />
                       </button>
                     )}
-                  </div>
+
                   <span className="order-3 flex shrink-0 items-center gap-1.5">
                   {topSection === "communities" && (
                     <>
@@ -2748,9 +2748,9 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                                   <span>{tx("＋ Предложить страну", "＋ Suggest a country")}</span>
                                   <ChevronRight className="h-3.5 w-3.5" />
                                 </button>
-                              </div>
-                            </div>
-                          </div>
+            
+          
+        
                         </PopoverContent>
                       </Popover>
 
@@ -2773,8 +2773,8 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                                   {subcategory === code && <Check className="h-3 w-3" />}
                                 </button>
                               ))}
-                            </div>
-                          </div>
+          
+        
                         </PopoverContent>
                       </Popover>
                     </>
@@ -2829,7 +2829,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     {approvedBots.slice(1, 3).length > 0 && <div className="grid grid-cols-2 gap-2">{approvedBots.slice(1, 3).map(bot => <BotRankingTile key={bot.id} bot={bot} variant="secondary" categoryLabel={bot.category === "General" ? tx("Без рубрики", "Uncategorized") : botTopicOptions.find(topic => topic.code === bot.category)?.label ?? bot.category} onOpen={() => openTelegramInNewBrowserTab(bot.telegramLink)} />)}</div>}
                     {approvedBots.slice(3, 7).length > 0 && <div className="grid grid-cols-4 gap-2">{approvedBots.slice(3, 7).map(bot => <BotRankingTile key={bot.id} bot={bot} variant="compact" categoryLabel={bot.category === "General" ? tx("Без рубрики", "Uncategorized") : botTopicOptions.find(topic => topic.code === bot.category)?.label ?? bot.category} onOpen={() => openTelegramInNewBrowserTab(bot.telegramLink)} />)}</div>}
                     {approvedBots.slice(7).length > 0 && <div className="grid grid-cols-2 gap-2">{approvedBots.slice(7).map(bot => <BotRankingTile key={bot.id} bot={bot} variant="secondary" categoryLabel={bot.category === "General" ? tx("Без рубрики", "Uncategorized") : botTopicOptions.find(topic => topic.code === bot.category)?.label ?? bot.category} onOpen={() => openTelegramInNewBrowserTab(bot.telegramLink)} />)}</div>}
-                  </div>
+
                 ) : (
                   <section className="rounded-2xl border border-dashed border-[#3390ec]/25 bg-[#202b3a] px-5 py-10 text-center">
                     <b className="block text-sm text-slate-200">{tx("Одобренных ботов пока нет", "No approved bots yet")}</b>
@@ -2858,8 +2858,8 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     <h2 className="text-sm font-semibold text-slate-200">{tx("NFT-направление", "NFT marketplace")}</h2>
                     <span className="text-[10px] text-slate-500">{tx("цифровые активы Telegram", "Telegram digital assets")}</span>
                   </span>
-                  <div className="flex items-center gap-1.5">
-                  </div>
+                  
+
                 </div>
                 <div aria-label="Рубрики NFT" className="flex gap-1.5 overflow-x-auto rounded-lg border border-white/8 bg-[#111720] p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {([
@@ -2898,12 +2898,12 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                         }}
                       />
                     ))}
-                  </div>
+
                 ) : (
                   <div className="rounded-2xl border border-dashed border-white/12 bg-[#111720] p-7 text-center">
                     <p className="text-sm font-medium text-slate-300">{tx("В этой категории NFT пока нет", "No NFTs in this category yet")}</p>
                     <p className="mt-1 text-xs leading-5 text-slate-500">{nftDealCategory === "auction" || nftDealCategory === "installments" || nftDealCategory === "collateral" ? tx("Первые предложения появятся после безопасного листинга владельцами. Никакие платежи или передачи здесь ещё не создаются.", "Offers will appear after owners create secure listings. No payment or transfer is created here.") : nftMarketCategory === "usernames" ? tx("Юзернеймы появятся здесь после размещения владельцем.", "Usernames will appear here after owner listing.") : tx("Раздел появится после добавления первых активов.", "This category will appear after the first assets are added.")}</p>
-                  </div>
+
                 )}
 
                 {/* NFT Listing Sheet */}
@@ -2944,13 +2944,13 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                         <div className="rounded-2xl border border-white/8 bg-white/5 p-4 text-center">
                           <b className="block text-xl font-bold text-slate-100">@{selectedNftForRent.username}</b>
                           <span className="mt-1 block text-sm text-slate-400">{selectedNftForRent.rentalPricePerDay} TON / {tx("день", "day")}</span>
-                        </div>
+      
 
                         <div>
                           <div className="flex items-center justify-between text-xs text-slate-300">
                             <span>{tx("Срок аренды (в днях)", "Rental duration (days)")}</span>
                             <b className="text-[#a6c8ff]">{rentalDaysInput} {tx("дней", "days")}</b>
-                          </div>
+        
                           <input
                             type="range"
                             min={selectedNftForRent.minRentalDays || 1}
@@ -2962,25 +2962,25 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                           <div className="mt-1 flex justify-between text-[10px] text-slate-500">
                             <span>{selectedNftForRent.minRentalDays} дн.</span>
                             <span>{selectedNftForRent.maxRentalDays} дн.</span>
-                          </div>
-                        </div>
+        
+      
 
                         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/8 p-3">
                           <div className="flex items-center gap-2 text-xs font-semibold text-emerald-300">
                             <Lock className="h-4 w-4 shrink-0" />
                             <span>{tx("Сейф-кошелек (без возможности передачи)", "Vault wallet (non-transferable)")}</span>
-                          </div>
+        
                           <p className="mt-1.5 text-[11px] leading-4 text-slate-400">
                             {tx("NFT блокируется в смарт-контракте сейфа. Вы получаете возможность привязать @юзернейм к своему Telegram-аккаунту на оплаченный срок, но передать или продать его нельзя.", "The NFT is locked in a dedicated smart-contract vault. You can bind the @username to your Telegram account, but neither party can transfer or sell it.")}
                           </p>
-                        </div>
+      
 
                         <div className="flex items-center justify-between rounded-xl bg-white/5 p-3 text-xs">
                           <span className="text-slate-400">{tx("Итого к оплате:", "Total payment:")}</span>
                           <b className="text-sm text-emerald-300">
                             {(rentalDaysInput * (Number(selectedNftForRent.rentalPricePerDay) || 0)).toFixed(2)} TON
                           </b>
-                        </div>
+      
 
                         <button
                           type="button"
@@ -2990,7 +2990,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                         >
                           {createNftRentalDeal.isPending ? tx("Оформляем…", "Processing…") : tx("Подтвердить аренду в сейф", "Confirm Vault Rental")}
                         </button>
-                      </div>
+    
                     )}
                   </SheetContent>
                 </Sheet>
@@ -3008,23 +3008,23 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                           <div className="mt-2 flex items-center justify-center gap-4 text-xs">
                             <span className="text-slate-400">{tx("Полная стоимость:", "Total price:")} <b className="text-slate-200">{selectedNftForInstallment.price}</b></span>
                             <span className="text-slate-400">{tx("Срок:", "Term:")} <b className="text-amber-300">{installmentDaysInput} {tx("дней", "days")}</b></span>
-                          </div>
-                        </div>
+        
+      
 
                         <div className="rounded-xl border border-amber-500/20 bg-amber-500/8 p-3">
                           <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
                             <Lock className="h-4 w-4 shrink-0" />
                             <span>{tx("Удержание в сейфе до полной выплаты", "Held in vault until fully paid")}</span>
-                          </div>
+        
                           <p className="mt-1.5 text-[11px] leading-4 text-slate-400">
                             {tx("После оплаты первого взноса юзернейм блокируется в сейф-кошельке и привязывается к вашему профилю Telegram. После закрытия остатка рассрочки NFT переводится в ваш личный кошелек.", "After the down payment, the username is locked in the vault and bound to your Telegram profile. Once fully paid, the NFT is transferred to your personal wallet.")}
                           </p>
-                        </div>
+      
 
                         <div className="flex items-center justify-between rounded-xl bg-white/5 p-3 text-xs">
                           <span className="text-slate-400">{tx("Первый взнос к оплате:", "Down payment due:")}</span>
                           <b className="text-sm text-amber-300">{installmentDownPaymentInput} TON</b>
-                        </div>
+      
 
                         <button
                           type="button"
@@ -3038,7 +3038,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                         >
                           {createNftInstallmentDealMutation.isPending ? tx("Оформляем…", "Processing…") : tx("Оформить рассрочку через Сейф", "Initialize Vault Installment")}
                         </button>
-                      </div>
+    
                     )}
                   </SheetContent>
                 </Sheet>
@@ -3076,7 +3076,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                         slot.group ? openGroup(slot.group.id, activeRankingBoardScope) : openMine(slot.isOccupied ? automaticPlacementSlot ?? undefined : slot)
                       }
                     />
-                  </div>
+
                 ))}
               </div>
               <div className="grid w-full grid-cols-4 gap-2">
@@ -3093,7 +3093,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                         slot.group ? openGroup(slot.group.id, activeRankingBoardScope) : openMine(slot.isOccupied ? automaticPlacementSlot ?? undefined : slot)
                       }
                     />
-                  </div>
+
                 ))}
               </div>
               <button
@@ -3118,7 +3118,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       salePrice={slot.group?.listingType === "sale" && slot.group.salePriceTon ? formatTon(slot.group.salePriceTon) : undefined}
                       onOpen={() => slot.group ? openGroup(slot.group.id, activeRankingBoardScope) : openMine(slot.isOccupied ? automaticPlacementSlot ?? undefined : slot)}
                     />
-                  </div>
+
                 ))}
                 {searchedGeneralList.map((group, index) => {
                   const isSale = group.listingType === "sale" && group.salePriceTon;
@@ -3135,7 +3135,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                         salePrice={isSale ? formatTon(group.salePriceTon!) : undefined}
                         onOpen={() => openGroup(group.id)}
                       />
-                    </div>
+  
                   );
                 })}
                 {topSearchQuery.trim() && searchedGeneralList.length === 0 && (
@@ -3190,28 +3190,28 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     <div className="flex min-w-0 flex-1 items-center gap-3">
                       <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl transition-transform duration-300 group-hover:scale-105">
                         <Avatar group={group} />
-                      </div>
+    
                       <span className="min-w-0 flex-1">
                         <b className="block truncate text-sm font-medium text-white transition-colors group-hover:text-[#a6c8ff]">{group.title}</b>
                         <small className="mt-1 block truncate text-xs text-slate-500">
                           {getCommunityAccessLabel(group, language)} · {n(group.membersCount)} {tx("участников", "members")}
                         </small>
                       </span>
-                    </div>
+  
                     <div className="flex shrink-0 items-center gap-3 text-right">
                       {group.rewardActive && <Star aria-label={tx("Доступна винагорода", "Rewards available")} className="h-3.5 w-3.5 shrink-0 fill-amber-200 text-amber-200" />}
                       {isSale ? (
                         <div className="flex flex-col items-end">
                           <b className="text-base font-semibold text-[#72a8ff]">{formatTon(group.salePriceTon!)} GRAM</b>
                           <small className="text-[10px] text-slate-400">{tx("Продажа", "For sale")}</small>
-                        </div>
+      
                       ) : (
                         <span className="rounded-md bg-white/5 px-2.5 py-1 text-[11px] font-medium text-slate-400">
                           {tx("Каталог", "Catalog")}
                         </span>
                       )}
                       <ChevronRight className="h-4 w-4 text-slate-600 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-[#3f8cff]" />
-                    </div>
+  
                   </button>
                 );
               })}
@@ -3395,7 +3395,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       <SortableContext items={visiblePinnedMyGroups.map(group => group.id)} strategy={rectSortingStrategy}>
                         <div className="grid grid-cols-3 gap-2">
                           {visiblePinnedMyGroups.map(group => <SortableMyGroupTile key={group.id} group={group} language={language} disabled={saveMyGroupsLayoutMutation.isPending} onOpen={() => openGroup(group.id)} onTogglePin={() => toggleMyGroupPin(group.id)} onCreateGiveaway={() => openGiveawayCreate(group)} selectionMode={myGroupsSelectionMode} selected={selectedGroupIds.includes(group.id)} onSelect={() => myGroupsSelectionMode ? toggleGroupSelection(group.id) : selectMyGroup(group.id)} />)}
-                        </div>
+      
                       </SortableContext>
                     </section>
                   )}
@@ -3410,7 +3410,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                             <span className="mt-1 block text-[9px] font-medium leading-3">{tx("Добавить", "Add")}</span>
                           </button>
                         ))}
-                      </div>
+    
                     </SortableContext>
                   </section>
                   <DragOverlay dropAnimation={{ duration: 190, easing: "cubic-bezier(0.23, 1, 0.32, 1)" }}>
@@ -3428,7 +3428,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     <FolderPlus className="mx-auto h-7 w-7 text-slate-600" />
                     <p className="mt-3 text-sm">{mine.length ? tx("По этому фильтру групп нет", "No groups match this filter") : tx("Групп пока нет", "No groups yet")}</p>
                     <p className="mt-1 text-xs text-slate-500">{mine.length ? tx("Смените фильтр или добавьте новую группу.", "Change the filter or add a new community.") : tx("Добавьте @TG_TOPBOT в администраторы.", "Add @TG_TOPBOT as an administrator.")}</p>
-                  </div>
+
                 )}
               </div>
             ) : (
@@ -3487,7 +3487,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       </span>}
                       <ChevronRight className={`h-4 w-4 text-slate-600 ${myGroupsSelectionMode ? "opacity-0" : ""}`} />
                     </button>
-                  </div>
+
                 </div>
               ))}
               {mine.length === 0 && (
@@ -3536,7 +3536,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       ["domains", tx("Домены", "Domains")],
                       ["other", tx("Другие", "Other")],
                     ] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setWalletNftFilter(value)} className={`h-7 shrink-0 rounded-full border px-2.5 text-[9px] font-medium ${walletNftFilter === value ? "border-[#3f8cff]/45 bg-[#3f8cff]/12 text-[#c8ddff]" : "border-white/10 bg-white/[0.025] text-slate-500"}`}>{label}</button>)}
-                  </div>
+
                   <div className="flex items-center justify-between px-0.5 text-[10px] text-slate-500"><span>{visibleWalletNfts.length} {tx("NFT", "NFTs")}</span><span className="font-mono">{safeWalletAddress.slice(0, 5)}…{safeWalletAddress.slice(-4)}</span></div>
                   {visibleWalletNfts.length ? <div className="grid grid-cols-2 gap-2">{visibleWalletNfts.map(item => <WalletNftCard key={item.address} item={item} language={language} onList={nft => {
                     setNftListingUsername(nft.name.replace(/^@/, "").trim());
@@ -3588,11 +3588,11 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       ) : (
                         <span className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1 text-[10px] font-semibold text-slate-400">Место не выбрано</span>
                       )}
-                    </div>
+  
                     <span className="flex items-center gap-1.5">
                       {detailRewardActive && <Star className="h-4 w-4 shrink-0 fill-[#ffd766] text-[#ffd766]" aria-label="Вознаграждение активно" />}
                     </span>
-                  </div>
+
 
                   <div className="mt-3 flex items-start gap-3">
                     <div className="relative shrink-0">
@@ -3602,14 +3602,14 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       <span className={`absolute bottom-1 right-1 inline-flex items-center gap-0.5 whitespace-nowrap text-[8px] font-medium leading-none ${dailyGrowthPct !== null && dailyGrowthPct < 0 ? "text-rose-300/75" : "text-emerald-300/75"}`}>
                         {dailyGrowthPct !== null && dailyGrowthPct < 0 ? <TrendingDown className="h-2 w-2" /> : <TrendingUp className="h-2 w-2" />}{dailyGrowthPct !== null && dailyGrowthPct > 0 ? "+" : ""}{dailyGrowthPct !== null ? `${dailyGrowthPct.toFixed(1)}%` : "0%"}
                       </span>
-                    </div>
+  
                     <div className="min-w-0 flex-1 pt-0.5">
                       <h1 className="mt-1 truncate text-[21px] font-bold tracking-tight text-white">{detail.group.title}</h1>
                       <p className="mt-1 flex items-center gap-1 text-xs font-medium text-slate-400"><span className="text-sm">▣</span>{detail.group.inviteLink && !detail.group.username ? "Приватное сообщество" : detail.group.category === "Каналы" ? "Канал" : "Группа"}</p>
                       {detail.group.description ? <p className="mt-2 line-clamp-4 text-xs leading-4 text-slate-300">{detail.group.description}</p> : <p className="mt-2 text-xs leading-4 text-slate-500">Описание сообщества не добавлено.</p>}
                       <p className="mt-1.5 truncate text-[11px] font-medium text-[#92b8ed]">{detailHeaderAddress}</p>
-                    </div>
-                  </div>
+  
+
 
                   <div className="mt-3 flex items-stretch gap-1.5">
                     <button
@@ -3642,30 +3642,30 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       {detail.group.managerAvatarUrl ? <img src={detail.group.managerAvatarUrl} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" /> : <UserRound className="h-4 w-4 shrink-0 text-slate-400" />}
                       <b className="truncate text-[9px] leading-3">{detail.group.managerName ?? "Менеджер"}</b>
                     </button>}
-                  </div>
+
 
                   {detail && <section className="mt-3 rounded-xl border border-[#31435f] bg-[#202b3a] p-3">
                     <div className="flex items-center justify-between gap-2">
                       <h2 className="text-base font-bold text-white">Динамика аудитории</h2>
                       <span className="text-xs font-semibold text-[#75adff]">{n(detail.group.membersCount)} {detailMembersLabel}</span>
-                    </div>
+  
                     <div aria-label="Период статистики" className="mt-2 flex gap-1 rounded-lg border border-white/8 bg-[#151d29] p-0.5">
                       {([['day', 'День'], ['month', 'Месяц'], ['all', 'Всё время']] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setDetailStatsPeriod(value)} className={`h-7 flex-1 rounded-md text-[10px] font-semibold transition-colors ${detailStatsPeriod === value ? 'bg-[#3f8cff]/18 text-[#b9d4ff]' : 'text-slate-500'}`}>{label}</button>)}
-                    </div>
+  
                     <div className="mt-2">
                       <AudienceGrowthChart snapshots={detail.snapshots} language={language} embedded />
-                    </div>
+  
                   </section>}
 
                   {detail && <div className="mt-3 grid grid-cols-2 gap-2">
                     <div className="rounded-xl border border-[#31435f] bg-[#202b3a] p-3">
                       <div className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-full bg-emerald-400/10 text-emerald-300"><TrendingUp className="h-4 w-4" /></span><span><small className="block text-[11px] text-slate-400">Вступления</small><b className="mt-0.5 block text-2xl leading-none text-white">{detailJoinedForPeriod === null ? '—' : n(detailJoinedForPeriod)}</b></span></div>
                       <small className="mt-2 block text-[10px] text-emerald-300">зафиксировано ботом</small>
-                    </div>
+  
                     <div className="rounded-xl border border-[#31435f] bg-[#202b3a] p-3">
                       <div className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-full bg-rose-400/10 text-rose-300"><TrendingDown className="h-4 w-4" /></span><span><small className="block text-[11px] text-slate-400">Отписались</small><b className="mt-0.5 block text-2xl leading-none text-white">{detailLeavesForPeriod === null ? '—' : n(detailLeavesForPeriod)}</b></span></div>
                       <small className="mt-2 block text-[10px] text-rose-300">зафиксировано ботом</small>
-                    </div>
+  
                     {detail.group.category === "Каналы" ? <>
                       <div className="rounded-xl border border-[#31435f] bg-[#202b3a] p-3"><div className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-full bg-[#3f8cff]/10 text-[#8fb9ff]"><Send className="h-4 w-4" /></span><span><small className="block text-[11px] text-slate-400">{detailStatsPeriod === 'day' ? 'Постов сегодня' : detailStatsPeriod === 'month' ? 'Постов за месяц' : 'Постов всего'}</small><b className="mt-0.5 block text-2xl leading-none text-white">{detailMessagesForPeriod === null ? "—" : n(detailMessagesForPeriod)}</b></span></div><small className="mt-2 block text-[10px] text-[#8fb9ff]">по наблюдениям бота</small></div>
                       <div className="rounded-xl border border-[#31435f] bg-[#202b3a] p-3"><div className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-full bg-amber-300/10 text-amber-200"><BarChart3 className="h-4 w-4" /></span><span><small className="block text-[11px] text-slate-400">Просмотры последнего поста</small><b className="mt-0.5 block text-2xl leading-none text-white">{detail.group.lastPostAt ? n(detail.group.lastPostViews) : "—"}</b></span></div><small className="mt-2 block text-[10px] text-amber-200">из Telegram</small></div>
@@ -3673,7 +3673,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       <div className="rounded-xl border border-[#31435f] bg-[#202b3a] p-3"><div className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-full bg-violet-400/10 text-violet-300"><UserPlus className="h-4 w-4" /></span><span><small className="block text-[11px] text-slate-400">Пригласили</small><b className="mt-0.5 block text-2xl leading-none text-white">{detailInvitedForPeriod === null ? '—' : n(detailInvitedForPeriod)}</b></span></div><small className="mt-2 block text-[10px] text-violet-300">подтверждено ботом</small></div>
                       <div className="rounded-xl border border-[#31435f] bg-[#202b3a] p-3"><div className="flex items-center gap-2.5"><span className="grid h-9 w-9 place-items-center rounded-full bg-[#3f8cff]/10 text-[#8fb9ff]"><MessageSquare className="h-4 w-4" /></span><span><small className="block text-[11px] text-slate-400">{detailStatsPeriod === 'day' ? 'Сообщений сегодня' : detailStatsPeriod === 'month' ? 'Сообщений за месяц' : 'Сообщений всего'}</small><b className="mt-0.5 block text-2xl leading-none text-white">{detailMessagesForPeriod === null ? "—" : n(detailMessagesForPeriod)}</b></span></div><small className="mt-2 block text-[10px] text-[#8fb9ff]">по наблюдениям бота</small></div>
                     </>}
-                  </div>}
+}
                   {detailReturnPage === "mine" && ownsDetail && rewardCampaignStats && (rewardCampaignStats.budgetReserved > 0 || rewardCampaignStats.confirmedParticipants > 0) && (
                     <section className="mt-3 overflow-hidden rounded-xl border border-emerald-300/20 bg-emerald-400/[0.055] p-3">
                       <div className="flex items-start justify-between gap-3">
@@ -3682,12 +3682,12 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                           <small className="mt-0.5 block text-[10px] leading-4 text-emerald-100/60">Личные ссылки создаются только при включённой кампании.</small>
                         </span>
                         <span className={`rounded-lg px-2 py-1 text-[9px] font-semibold ${rewardCampaignStats.campaignActive ? "bg-emerald-300/15 text-emerald-200" : "bg-white/8 text-slate-300"}`}>{rewardCampaignStats.campaignActive ? "Кампания активна" : "Кампания завершена"}</span>
-                      </div>
+    
                       <div className="mt-3 grid grid-cols-3 gap-2">
                         <span className="rounded-lg border border-white/8 bg-black/10 p-2"><small className="block text-[9px] text-slate-400">Внесено</small><b className="mt-0.5 block text-xs text-white">{formatGram(rewardCampaignStats.budgetReserved)} GRAM</b></span>
                         <span className="rounded-lg border border-white/8 bg-black/10 p-2"><small className="block text-[9px] text-slate-400">Выплачено</small><b className="mt-0.5 block text-xs text-emerald-200">{formatGram(rewardCampaignStats.paidOut)} GRAM</b></span>
                         <span className="rounded-lg border border-white/8 bg-black/10 p-2"><small className="block text-[9px] text-slate-400">Остаток</small><b className="mt-0.5 block text-xs text-amber-100">{formatGram(rewardCampaignStats.refundableRemainder)} GRAM</b></span>
-                      </div>
+    
                       <div className="mt-3 flex items-center justify-between gap-3 text-[10px]"><span className="text-slate-300">Подтверждённые участники: <b className="text-white">{rewardCampaignStats.confirmedParticipants}</b></span><span className="text-slate-400">Персональных ссылок: {rewardCampaignStats.personalLinks}</span></div>
                       {rewardCampaignStats.participants.length > 0 && <div className="mt-2 space-y-1 border-t border-white/8 pt-2">{rewardCampaignStats.participants.slice(0, 5).map(participant => <div key={participant.id} className="flex items-center justify-between gap-3 text-[10px]"><span className="min-w-0 truncate text-slate-300">{participant.username ? `@${participant.username}` : participant.name}</span><b className="shrink-0 text-emerald-200">+{formatGram(participant.amount)} GRAM</b></div>)}</div>}
                       <small className="mt-3 block text-[9px] leading-4 text-slate-400">При снятии лота ставка за место не возвращается. Возвращается только этот неиспользованный остаток бюджета.</small>
@@ -3701,7 +3701,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       </button>
                       {channelGiftsOpen && <div className="border-t border-white/8 p-2.5">
                         {channelGiftsQuery.isPending ? <div className="grid grid-cols-3 gap-2">{Array.from({ length: 6 }).map((_, index) => <div key={index} className="aspect-square animate-pulse rounded-xl bg-white/[0.04]" />)}</div> : channelGiftsQuery.isError ? <p className="rounded-lg bg-rose-500/[0.06] px-2.5 py-2 text-[10px] leading-4 text-rose-100/80">{channelGiftsQuery.error.message}</p> : channelGifts.length ? <div className="grid grid-cols-3 gap-2">{channelGifts.map(gift => <div key={gift.id} className="min-w-0 rounded-xl border border-white/8 bg-[#17212b] p-1.5"><div className="aspect-square overflow-hidden rounded-lg bg-[radial-gradient(circle_at_50%_35%,rgba(255,206,84,.16),transparent_55%),#111925]"><ChannelGiftMediaPreview gift={gift} /></div><b className="mt-1 block truncate text-center text-[8px] text-slate-100">{gift.title}</b><small className="mt-0.5 block truncate text-center text-[7px] text-slate-500">{gift.unique ? "Уникальный" : "Подарок"} · только просмотр</small></div>)}</div> : <p className="px-1 py-2 text-[10px] leading-4 text-slate-500">Telegram не вернул подарки для этого канала.</p>}
-                      </div>}
+    }
                     </section>
                   )}
                 </div>
@@ -3725,49 +3725,49 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                                   <Input value={listingRankingBid} inputMode="decimal" onChange={event => { const value = event.target.value.replace(",", "."); if (/^\\d*(\\.\\d?)?$/.test(value)) setListingRankingBid(value); }} onBlur={() => setListingRankingBid(formatTon(listingRankingBidAmount))} aria-label={tx("Цена места в GRAM", "Ranking price in GRAM")} className="h-8 flex-1 border-0 bg-transparent px-0 text-center text-sm font-semibold text-white focus-visible:ring-0" />
                                   <b className="mr-1 text-[9px] text-slate-500">GRAM</b>
                                   <button type="button" onClick={() => setListingRankingBid(formatTon(Math.min(MAX_RANKING_BID_GRAM, listingRankingBidAmount + 0.1)))} aria-label={tx("Увеличить цену", "Increase price")} className="grid h-8 w-8 place-items-center rounded-md text-[#a6c8ff]"><Plus className="h-3.5 w-3.5" /></button>
-                                </div>
+              
                                 <Slider value={[Math.min(MAX_RANKING_SLIDER_GRAM, listingRankingBidAmount)]} min={0.1} max={MAX_RANKING_SLIDER_GRAM} step={0.1} onValueChange={([value]) => setListingRankingBid(formatTon(value))} className="mt-1 py-1 [&_[data-slot=slider-track]]:h-1.5 [&_[data-slot=slider-range]]:!bg-[#3f8cff] [&_[data-slot=slider-thumb]]:size-4 [&_[data-slot=slider-thumb]]:!bg-[#3f8cff]" />
-                              </div>
+            
                               <div className="col-span-2 rounded-lg bg-black/15 px-2 py-1.5 text-[10px]">
                                 {listingRankingPreviewSlotNumber ? <><span className="block text-slate-500">{tx("Прогноз позиции", "Placement preview")}</span><b className="mt-0.5 block text-[#a6c8ff]">{tx(`Займёт ${listingRankingPreviewSlotNumber}-ю позицию`, `Will take position ${listingRankingPreviewSlotNumber}`)}</b></> : <b className="text-amber-100">{tx("Увеличьте ставку для Top", "Increase the bid to enter Top")}</b>}
-                              </div>
+            
                               <div>
                                 <label className="mb-1 block text-[10px] text-slate-500">{tx("Страна", "Country")}</label>
                                 <Select value={listingCountry} onValueChange={value => { setListingCountry(value); setListingCity("Все"); }}><SelectTrigger className="h-8 rounded-lg border-white/10 bg-[#0b0f14] text-[10px] text-slate-200"><SelectValue /></SelectTrigger><SelectContent className="z-[90] border-white/10 bg-[#111720] text-slate-100"><SelectItem value="Все">{tx("Весь мир", "Worldwide")}</SelectItem>{managedCountries.filter(item => item.code !== "Global" && item.code !== "Все").map(item => <SelectItem key={item.id} value={item.code}>{item.label}</SelectItem>)}</SelectContent></Select>
-                              </div>
+            
                               <div>
                                 <label className="mb-1 block text-[10px] text-slate-500">{tx("Город", "City")}</label>
                                 <Select value={listingCity} onValueChange={setListingCity}><SelectTrigger className="h-8 rounded-lg border-white/10 bg-[#0b0f14] text-[10px] text-slate-200"><SelectValue /></SelectTrigger><SelectContent className="z-[90] border-white/10 bg-[#111720] text-slate-100"><SelectItem value="Все">{tx("Не указан", "Not specified")}</SelectItem>{managedCities.filter(city => city.countryCode === listingCountry).map(item => <SelectItem key={item.id} value={item.code}>{item.label}</SelectItem>)}</SelectContent></Select>
-                              </div>
+            
                               <div className="col-span-2">
                                 <label className="mb-1 block text-[10px] text-slate-500">{tx("Подкатегория", "Subcategory")}</label>
                                 <Select value={listingSubcategory || "General"} onValueChange={setListingSubcategory}><SelectTrigger className="h-8 rounded-lg border-white/10 bg-[#0b0f14] text-[10px] text-slate-200"><SelectValue /></SelectTrigger><SelectContent className="z-[90] border-white/10 bg-[#111720] text-slate-100"><SelectItem value="General">{tx("Все рубрики", "All topics")}</SelectItem>{listingSubcategoryOptions.filter(item => item !== "General").map(item => <SelectItem key={item} value={item}>{getManagedTopicLabel(listingCategory ?? "Каналы", item)}</SelectItem>)}</SelectContent></Select>
-                              </div>
-                            </div>
-                          </div>
+            
+          
+        
                           <div className="flex items-center justify-between gap-3 rounded-lg bg-black/15 px-2.5 py-1.5">
                             <span><b className="block text-[11px] text-slate-200">{detailVisibility === "public" ? tx("Публичная публикация", "Public publication") : tx("Анонимная публикация", "Anonymous publication")}</b><small className="mt-0.5 block text-[10px] text-slate-500">{detailVisibility === "public" ? tx("Другие смогут перейти в ваш профиль", "Others can open your profile") : tx("Владелец не показывается в карточке", "The owner stays hidden in the card")}</small></span>
                             <button type="button" role="switch" aria-checked={detailVisibility === "public"} onClick={() => setDetailVisibility(value => value === "public" ? "anonymous" : "public")} className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${detailVisibility === "public" ? "border-[#72a8ff] bg-[#3f8cff]" : "border-white/15 bg-white/8"}`}><span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${detailVisibility === "public" ? "translate-x-6" : "translate-x-0"}`} /></button>
-                          </div>
+        
                           <div className="grid grid-cols-3 gap-1.5">
                             <button type="button" onClick={() => setListingAnnouncementEnabled(value => !value)} className={`rounded-lg border px-2 py-1.5 text-left transition-colors ${listingAnnouncementEnabled ? "border-[#3f8cff]/35 bg-[#3f8cff]/10" : "border-white/8 bg-black/15"}`}><b className="block text-[11px] text-slate-200">{tx("Объявление", "Announcement")}</b><small className={`mt-0.5 block text-[10px] ${listingAnnouncementEnabled ? "text-[#8fb9ff]" : "text-slate-500"}`}>{listingAnnouncementEnabled ? tx("Бот напишет в группе", "Bot will post") : tx("Отключено", "Off")}</small></button>
                             <button type="button" onClick={() => { setLotGroupId(detail.group.id); setSelectedManagerTelegramUserId(detail.group.managerTelegramUserId ?? null); setManagerPublic(detail.group.managerPublic !== false); setManagerSheetOpen(true); }} className="rounded-lg border border-[#3f8cff]/25 bg-[#3f8cff]/[0.08] px-2 py-1.5 text-left transition-colors hover:bg-[#3f8cff]/[0.13]"><b className="block text-[11px] text-slate-200">{tx("Менеджер", "Manager")}</b><small className="mt-0.5 block truncate text-[10px] text-[#8fb9ff]">{detail.group.managerName ?? tx("Выбрать администратора", "Choose administrator")}</small></button>
                             <button type="button" onClick={() => setListingCardBackgroundSheetOpen(true)} className="rounded-lg border border-white/8 bg-black/15 px-2 py-1.5 text-left transition-colors hover:bg-white/[0.055]"><span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded border border-white/20" style={{ backgroundColor: THEME_BACKGROUND_OPTIONS.find(item => item.value === listingCardBackgroundPreset)?.color ?? "var(--tg-shell-bg)" }} /><b className="block truncate text-[11px] text-slate-200">{tx("Фон карточки", "Card background")}</b></span><small className="mt-0.5 block truncate text-[10px] text-[#8fb9ff]">{listingCardBackgroundPreset ? THEME_BACKGROUND_OPTIONS.find(item => item.value === listingCardBackgroundPreset)?.label : tx("Как в приложении", "Use app color")}</small></button>
-                          </div>
+        
                           {detail.group.managerName && <div className="flex items-center justify-between gap-3 rounded-lg bg-black/15 px-2.5 py-1.5"><span><b className="block text-[11px] text-slate-200">{tx("Показывать менеджера", "Show manager")}</b><small className="mt-0.5 block text-[10px] text-slate-500">{managerPublic ? tx("Гости увидят профиль менеджера", "Guests can open the manager profile") : tx("Скрыт из публичной карточки", "Hidden from public details")}</small></span><button type="button" role="switch" aria-checked={managerPublic} onClick={() => setManagerPublic(value => !value)} className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${managerPublic ? "border-[#72a8ff] bg-[#3f8cff]" : "border-white/15 bg-white/8"}`}><span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${managerPublic ? "translate-x-6" : "translate-x-0"}`} /></button></div>}
                           {detail.group.username && <div className="flex items-center justify-between gap-3 rounded-lg bg-black/15 px-2.5 py-1.5"><span><b className="block text-[11px] text-slate-200">Показывать в Google</b><small className="mt-0.5 block text-[10px] text-slate-500">Создаст публичную страницу tgtop.me/c/{detail.group.username}</small></span><button type="button" role="switch" aria-checked={searchIndexable} onClick={() => setSearchIndexable(value => !value)} className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${searchIndexable ? "border-[#72a8ff] bg-[#3f8cff]" : "border-white/15 bg-white/8"}`}><span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${searchIndexable ? "translate-x-6" : "translate-x-0"}`} /></button></div>}
                           <div className="flex items-center justify-between gap-3 rounded-lg bg-black/15 px-2.5 py-1.5">
                             <span><b className="block text-[11px] text-slate-200">{tx("Выставить на продажу", "Offer for sale")}</b><small className="mt-0.5 block text-[10px] text-slate-500">{isListingForSale ? tx("Цена будет видна покупателям", "Buyers will see the price") : tx("Без продажи", "Not for sale")}</small></span>
                             <button type="button" role="switch" aria-checked={isListingForSale} onClick={() => setIsListingForSale(value => !value)} className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${isListingForSale ? "border-[#72a8ff] bg-[#3f8cff]" : "border-white/15 bg-white/8"}`}><span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${isListingForSale ? "translate-x-6" : "translate-x-0"}`} /></button>
-                          </div>
+        
                           {isListingForSale && <div className="relative"><Input value={salePriceTon} inputMode="decimal" onChange={event => { const value = event.target.value.replace(",", "."); if (/^\d*(\.\d?)?$/.test(value)) setSalePriceTon(value); }} placeholder={tx("Цена продажи", "Sale price")} className="h-9 border-white/10 bg-black/15 pr-14 text-sm" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-500">GRAM</span></div>}
                           <div className="flex items-center justify-between gap-3 rounded-lg bg-black/15 px-2.5 py-1.5">
                             <span><b className="block text-[11px] text-slate-200">{tx("Вознаграждения", "Rewards")}</b><small className="mt-0.5 block text-[10px] text-slate-500">{rewardCampaignEnabled ? tx("GRAM за подтверждённые действия", "GRAM for confirmed actions") : tx("Выключены", "Off")}</small></span>
                             <button type="button" role="switch" aria-checked={rewardCampaignEnabled} onClick={() => setRewardCampaignEnabled(value => !value)} className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${rewardCampaignEnabled ? "border-[#72a8ff] bg-[#3f8cff]" : "border-white/15 bg-white/8"}`}><span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${rewardCampaignEnabled ? "translate-x-6" : "translate-x-0"}`} /></button>
-                          </div>
+        
                           {rewardCampaignEnabled && <div className="grid grid-cols-2 gap-2"><div className="relative"><Input value={rewardBudget} inputMode="decimal" onChange={event => setRewardBudget(event.target.value)} placeholder={tx("Бюджет", "Budget")} className="h-9 border-white/10 bg-black/15 pr-10 text-[11px] placeholder:text-[11px]" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-medium text-slate-500">GRAM</span></div><div className="relative"><Input value={rewardPerSubscription} inputMode="decimal" onChange={event => setRewardPerSubscription(event.target.value)} placeholder={detail.group.category === "Чаты" ? tx("За участника", "Per member") : tx("За подписчика", "Per subscriber")} className="h-9 border-white/10 bg-black/15 pr-10 text-[11px] placeholder:text-[11px]" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-medium text-slate-500">GRAM</span></div></div>}
                           <button type="button" onClick={saveInlineDetailListing} disabled={listWithCredits.isPending} className="flex w-full items-center justify-between rounded-lg bg-[#1688f5] px-3 py-2 text-left text-white shadow-md shadow-[#1688f5]/20 transition-transform active:scale-[0.985] disabled:opacity-50"><span><b className="block text-xs">{listWithCredits.isPending ? tx("Сохраняем…", "Saving…") : detail.group.status === "listed" ? tx("Сохранить изменения", "Save changes") : tx("Разместить в каталоге", "List in catalog")}</b><small className="mt-0.5 block text-[10px] text-white/70">{detail.group.status === "listed" ? tx("Без повторной оплаты", "No repeat charge") : tx("От 0.1 GRAM", "From 0.1 GRAM")}</small></span><ChevronRight className="h-4 w-4" /></button>
-                        </div>
+      
                       )}
                     </section>
                   )}
@@ -3789,7 +3789,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                         <span>{tx("Розыгрыш", "Giveaway")}</span>
                         <Star className="h-3.5 w-3.5 fill-current" />
                       </button>
-                    </div>
+  
                   )}
                   {detail && ownsDetail && detail.group.category === "Чаты" && (
                     <div className="hidden order-3 mt-3 space-y-3 rounded-xl border border-white/8 bg-white/4 p-3">
@@ -3811,16 +3811,16 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                         >
                           <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${detail.group.deleteServiceMessages ? "translate-x-6" : "translate-x-0"}`} />
                         </button>
-                      </div>
-                    </div>
+    
+  
                   )}
                   {detail && !ownsDetail && moderationAccess?.canModerate && detail.group.status === "listed" && (
                     <div className="order-3 mt-3 flex items-center gap-1.5 rounded-xl border border-white/8 bg-[#111720] p-2">
                       <div className="flex min-w-0 flex-1 items-center gap-1.5">
                         <Input value={detailModerationReason} onChange={event => setDetailModerationReason(event.target.value)} placeholder="Причина снятия" className="h-8 min-w-0 flex-1 border-red-300/15 bg-red-500/[0.04] px-2 text-[10px] text-slate-100 placeholder:text-slate-600" />
                         <button type="button" onClick={() => moderateGroup.mutate({ groupId: detail.group.id, action: "review", reason: detailModerationReason.trim() })} disabled={detailModerationReason.trim().length < 3 || moderateGroup.isPending} className="shrink-0 rounded-lg border border-rose-300/20 bg-rose-300/5 px-2.5 py-2 text-[10px] font-semibold text-rose-200 transition-colors hover:bg-rose-300/10 disabled:opacity-50">{moderateGroup.isPending ? "Снимаем…" : "Снять"}</button>
-                      </div>
-                    </div>
+    
+  
                   )}
                   {placementSlot && (
                     <section className="mt-3 rounded-xl border border-[#31435f] bg-[#17212b] p-3">
@@ -3835,7 +3835,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                           disabled={ownsDetail && unlistGroups.isPending}
                           className="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border border-rose-300/25 bg-rose-300/[0.07] px-2 text-[9px] font-semibold text-rose-100 transition-colors hover:bg-rose-300/[0.13] disabled:opacity-50"
                         ><X className="h-3.5 w-3.5" />{tx("Снять лот", "Remove lot")}</button>}
-                      </div>
+    
 
                       {!selectedLotGroup ? (
                         <div className="mt-2 rounded-xl border border-[#31435f] bg-[#101a2d] p-2">
@@ -3843,7 +3843,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                           <button type="button" onClick={() => { if (!isAuthenticated) { toast.message(tx("Войдите через Telegram, чтобы добавить свою группу", "Sign in with Telegram to add your community")); return; } setLotGroupPickerOpen(true); }} aria-label="Добавить свою группу" title="Добавить свою группу" className="mt-2 flex h-10 w-full items-center justify-center rounded-xl border border-dashed border-[#3f8cff]/35 bg-[#3f8cff]/[0.045] text-[#a6c8ff] transition-colors hover:bg-[#3f8cff]/12 active:scale-[0.985]">
                             <Plus className="h-5 w-5" />
                           </button>
-                        </div>
+      
                       ) : (
                         <button type="button" onClick={() => setLotGroupPickerOpen(true)} className="mt-2 flex w-full items-center gap-2 rounded-xl border border-[#3390ec]/55 bg-[#213750] p-2 text-left transition-colors hover:bg-[#274363]">
                           <Avatar group={selectedLotGroup} compact />
@@ -3861,7 +3861,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                           <span className="min-w-0"><small className="block text-[9px] font-medium uppercase tracking-wide text-slate-500">Подкатегория</small><b className="mt-1 block truncate text-[11px] text-slate-100">{getManagedTopicLabel(selectedLotGroup.category, listingSubcategory)}</b></span>
                           <ChevronRight className="h-4 w-4 shrink-0 rotate-90 text-[#8fc4ff]" />
                         </button>
-                      </div>}
+    }
 
                       {selectedLotGroup && <div className="mt-2 grid grid-cols-2 gap-2">
                         <button type="button" disabled={lotSettingsLocked} onClick={() => setListingAnnouncementEnabled(value => !value)} className={`rounded-xl border p-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${listingAnnouncementEnabled ? "border-[#3b80c4]/55 bg-[#213750]" : "border-[#354966] bg-[#202b3a]"}`}>
@@ -3870,14 +3870,14 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                         <button type="button" disabled={lotSettingsLocked} onClick={() => { if (!selectedLotGroup) return; setSelectedManagerTelegramUserId(managerPublic ? selectedLotGroup.managerTelegramUserId ?? null : null); setManagerSheetOpen(true); }} className="rounded-xl border border-[#354966] bg-[#202b3a] p-2 text-left transition-colors hover:bg-[#253247] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35">
                           <b className="block text-[11px] text-slate-100">Менеджер</b><small className="mt-1 block truncate text-[10px] text-[#8fc4ff]">{managerPublic && selectedLotGroup?.managerName ? selectedLotGroup.managerName : "Анонимно"}</small>
                         </button>
-                      </div>}
+    }
 
                       {selectedLotGroup && <div aria-disabled={lotSettingsLocked} className="mt-2 space-y-1 border-t border-white/[0.06] pt-2">
                         <div className="flex items-center justify-between gap-3 rounded-lg px-1 py-1"><span><b className="block text-[11px] text-slate-200">Выставить на продажу</b><small className="block text-[10px] text-slate-500">{isListingForSale ? "Цена видна покупателям" : "Без продажи"}</small></span><button type="button" role="switch" aria-checked={isListingForSale} onClick={() => setIsListingForSale(value => !value)} className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${isListingForSale ? "border-[#3390ec] bg-[#3390ec]" : "border-white/15 bg-[#2b3648]"}`}><span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${isListingForSale ? "translate-x-6" : "translate-x-0"}`} /></button></div>
                         {isListingForSale && <div className="relative"><Input value={salePriceTon} inputMode="decimal" onChange={event => { const value = event.target.value.replace(",", "."); if (/^\d*(\.\d?)?$/.test(value)) setSalePriceTon(value); }} placeholder="Цена продажи" className="h-9 border-[#354966] bg-[#202b3a] pr-12 text-xs" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-500">GRAM</span></div>}
                         <div className="flex items-center justify-between gap-3 rounded-lg px-1 py-1"><span><b className="flex items-center gap-1 text-[11px] text-slate-200"><Star className="h-3.5 w-3.5 fill-[#ffd766] text-[#ffd766]" />Вознаграждения</b><small className="block text-[10px] text-slate-500">{rewardCampaignEnabled ? "Включены" : "Выключены"}</small></span><button type="button" role="switch" aria-checked={rewardCampaignEnabled} onClick={() => setRewardCampaignEnabled(value => !value)} className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${rewardCampaignEnabled ? "border-[#3390ec] bg-[#3390ec]" : "border-white/15 bg-[#2b3648]"}`}><span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${rewardCampaignEnabled ? "translate-x-6" : "translate-x-0"}`} /></button></div>
                         {rewardCampaignEnabled && <div className="grid grid-cols-2 gap-2"><Input value={rewardBudget} inputMode="decimal" onChange={event => setRewardBudget(event.target.value)} placeholder="Бюджет, GRAM" className="h-9 border-[#354966] bg-[#202b3a] text-[11px]" /><Input value={rewardPerSubscription} inputMode="decimal" onChange={event => setRewardPerSubscription(event.target.value)} placeholder="За подписчика" className="h-9 border-[#354966] bg-[#202b3a] text-[11px]" /></div>}
-                      </div>}
+    }
                     </section>
                   )}
                   {placementSlot && selectedLotGroup && (
@@ -3885,12 +3885,12 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       <div className="flex items-center justify-between">
                         <span><h2 className="text-sm font-bold text-slate-100">{selectedSlot ? "Текущая ставка за лот" : "Ставка для размещения"}</h2><small className="mt-0.5 block text-[10px] text-slate-500">Место #{placementSlot.slotNumber}</small></span>
                         <b className="text-sm text-[#63f5b1]">{formatTon(selectedSlot ? selectedSlot.bidAmount / 1000 : detailMinimumBid ?? 0.1)} GRAM</b>
-                      </div>
+    
                       <div className="mt-3 flex h-12 items-center rounded-xl border border-[#354966] bg-[#101a2d] p-1.5">
                         <button type="button" disabled={!selectedLotGroup} onClick={() => setDetailBidInput(formatTon(Math.max(detailMinimumBid ?? 0.1, detailRankingBidAmount - 0.1)))} aria-label="Уменьшить ставку" className="grid h-9 w-12 place-items-center rounded-lg text-slate-300 transition-colors hover:bg-white/[0.07] disabled:opacity-35"><Minus className="h-5 w-5" /></button>
                         <Input value={detailBidInput} disabled={lotSettingsLocked} readOnly={lotSettingsLocked} inputMode="decimal" onChange={event => { const value = event.target.value.replace(",", "."); if (/^\d*(\.\d?)?$/.test(value)) setDetailBidInput(value); }} onBlur={() => setDetailBidInput(formatTon(detailRankingBidAmount))} aria-label="Новая ставка в GRAM" className="h-9 min-w-0 flex-1 rounded-lg border-0 bg-[#17212b] px-1 text-center text-lg font-bold text-white focus-visible:ring-0" />
                         <button type="button" disabled={!selectedLotGroup} onClick={() => setDetailBidInput(formatTon(Math.min(MAX_RANKING_BID_GRAM, detailRankingBidAmount + 0.1)))} aria-label="Увеличить ставку" className="grid h-9 w-12 place-items-center rounded-lg text-[#8fc4ff] transition-colors hover:bg-[#3f8cff]/12 disabled:opacity-35"><Plus className="h-5 w-5" /></button>
-                      </div>
+    
                       <div className="mt-2 rounded-xl border border-[#31435f] bg-[#202b3a] px-3 pb-2 pt-1"><Slider disabled={!selectedLotGroup} value={[Math.min(MAX_RANKING_SLIDER_GRAM, detailRankingBidAmount)]} min={detailMinimumBid ?? 0.1} max={Math.max(detailMinimumBid ?? 0.1, MAX_RANKING_SLIDER_GRAM)} step={0.1} onValueChange={([value]) => setDetailBidInput(formatTon(value))} className="py-1.5 [&_[data-slot=slider-track]]:h-2 [&_[data-slot=slider-track]]:bg-[#0f1825] [&_[data-slot=slider-range]]:!bg-[#3390ec] [&_[data-slot=slider-thumb]]:size-5 [&_[data-slot=slider-thumb]]:!border-[#c8e1ff] [&_[data-slot=slider-thumb]]:!bg-[#3390ec]" /><div className="mt-1 flex justify-between text-[9px] font-medium text-slate-500"><span>от {formatTon(detailMinimumBid)} GRAM</span><span>шаг 0.1</span><span>до {formatTon(MAX_RANKING_SLIDER_GRAM)}</span></div></div>
                       {selectedLotGroup && detailRankingPreviewSlotNumber && <div className="mt-2 rounded-xl border border-[#3390ec]/45 bg-[#18314d] p-2.5 text-center"><small className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8fc4ff]">Ваша группа займёт</small><div className="mt-2 grid grid-cols-2 gap-2"><div className="rounded-lg bg-[#17212b] px-2 py-1.5"><small className="block text-[9px] text-slate-400">Общий ТОП</small><b className="text-lg leading-none text-white">#{detailRankingPreviewSlotNumber}</b></div><div className="rounded-lg bg-[#17212b] px-2 py-1.5"><small className="block text-[9px] text-slate-400">ТОП {selectedLotGroup.category === "Каналы" ? "каналов" : "чатов"}</small><b className="text-lg leading-none text-[#63f5b1]">#{detailTypeRankingPreviewPosition ?? "—"}</b></div></div></div>}
                       <p className={`mt-2 text-center text-[10px] ${detailWillDrop ? "font-medium text-rose-300" : "text-slate-500"}`}>{detailWillDrop ? `Ваша цена ниже текущей ставки. Лот переместится на место #${detailRankingPreviewSlotNumber}` : ownsDetail ? `Минимальная ставка: ${formatTon(detailMinimumBid)} GRAM` : `Перебить можно от ${formatTon(detailMinimumBid)} GRAM`}</p>
@@ -3922,7 +3922,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       <h1 className="truncate text-lg font-semibold">{publicOwner.owner.name ?? tx("Пользователь TG TOP", "TG TOP user")}</h1>
                       <small className="mt-1 block truncate text-xs text-slate-500">{publicOwner.owner.telegramUsername ? `@${publicOwner.owner.telegramUsername}` : tx("Профиль владельца", "Owner profile")}</small>
                     </span>
-                  </div>
+
                   <div className="mt-5"><Metric label={tx("Активные площадки", "Active communities")} value={n(publicOwner.groups.length, language)} note={tx("в каталоге TG TOP", "listed in TG TOP")} /></div>
                 </div>
                 <section className="space-y-2">
@@ -3994,7 +3994,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                         {telegramUserAgentStatus.ownerDm?.active ? <div className="rounded-xl border border-[#72a8ff]/20 bg-[#3f8cff]/[0.07] p-3 text-[11px] leading-4 text-[#c8ddff]">Личный канал TG TOP Assistant закреплён за @{telegramUserAgentStatus.ownerDm.username}. Другие личные сообщения не будут иметь доступа.</div> : <div className="space-y-2 rounded-xl border border-white/8 bg-white/[0.035] p-3"><p className="text-[11px] leading-4 text-slate-400">Одно стартовое приветствие будет отправлено только указанному owner-аккаунту. Username сразу закрепится как постоянный Telegram ID.</p><Input value={telegramOwnerDmUsername} onChange={event => setTelegramOwnerDmUsername(event.target.value)} autoComplete="off" placeholder="@username владельца" className="h-10 border-white/10 bg-[#17212b] text-sm text-slate-100" /><Button onClick={() => bootstrapTelegramOwnerDm.mutate({ username: telegramOwnerDmUsername })} disabled={bootstrapTelegramOwnerDm.isPending || telegramOwnerDmUsername.trim().length < 5} className="h-10 w-full bg-[#3f8cff] text-sm text-white">{bootstrapTelegramOwnerDm.isPending ? ui.loading : "Отправить стартовое приветствие"}</Button></div>}
                         <Button variant="outline" onClick={() => disconnectTelegramUserAgent.mutate()} disabled={disconnectTelegramUserAgent.isPending} className="h-11 w-full border-red-300/25 text-red-100">{disconnectTelegramUserAgent.isPending ? ui.loading : "Отключить рабочий аккаунт"}</Button>
                       </>}
-                    </div>
+  
                   </SheetContent>
                 </Sheet>
               </>
@@ -4007,7 +4007,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                   <div className="grid grid-cols-2 rounded-xl border border-white/8 bg-[#111720] p-0.5">
                     <button type="button" onClick={() => setModerationTab("communities")} className={`h-9 rounded-lg text-xs font-semibold transition-all ${moderationTab === "communities" ? "bg-[#3f8cff] text-white shadow-md shadow-[#3f8cff]/25 font-bold" : "text-slate-400 hover:text-slate-200"}`}>Сообщества <span className="ml-1 text-[10px] opacity-80">{activeModerationListings.length}</span></button>
                     <button type="button" onClick={() => setModerationTab("bots")} className={`h-9 rounded-lg text-xs font-semibold transition-all ${moderationTab === "bots" ? "bg-[#3f8cff] text-white shadow-md shadow-[#3f8cff]/25 font-bold" : "text-slate-400 hover:text-slate-200"}`}>Боты <span className="ml-1 text-[10px] opacity-80">{allBotListings.length}</span></button>
-                  </div>
+
                   {moderationTab === "communities" ? (
                     <section className="overflow-hidden rounded-2xl border border-[#3390ec]/25 bg-[#202b3a]"><div className="border-b border-white/8 px-3 py-3"><b className="text-sm text-slate-100">Залистенные сообщества</b><p className="mt-1 text-[11px] leading-4 text-slate-400">Полный список по времени листинга: свежие сверху.</p></div>{activeModerationListings.length ? <div className="divide-y divide-white/8">{activeModerationListings.map(group => { const groupUrl = group.inviteLink ?? (group.username ? `https://t.me/${group.username}` : null); return <article key={group.id} className="flex items-center gap-2 px-3 py-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/10 bg-[#17212b] text-[10px] font-semibold text-slate-300">{group.avatarFileId ? <img src={`/api/telegram-avatar/${encodeURIComponent(group.chatId)}`} alt="" className="h-full w-full object-cover" /> : group.title.slice(0, 1).toUpperCase()}</span><button type="button" onClick={() => groupUrl && openTelegramInNewBrowserTab(groupUrl)} disabled={!groupUrl} className="min-w-0 flex-1 text-left disabled:opacity-50"><b className="block truncate text-xs text-slate-100">{group.title}</b><small className="block truncate text-[10px] text-slate-400">{group.category} · {group.ownerName ?? "Владелец"} · {group.listedAt ? new Date(group.listedAt).toLocaleString() : "—"}</small></button><button type="button" onClick={() => { setModerationReasonDraft(""); setPendingModerationGroup({ id: group.id, title: group.title }); }} disabled={moderateGroup.isPending} aria-label={`Снять ${group.title} с ТОПа`} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-red-400/35 bg-red-500/10 text-red-200 disabled:opacity-35"><Trash2 className="h-4 w-4" /></button></article>; })}</div> : <p className="px-4 py-8 text-center text-xs text-slate-500">Залистенных сообществ сейчас нет.</p>}</section>
                   ) : (
@@ -4093,7 +4093,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                   <div className="flex gap-2">
                     <button type="button" onClick={() => setPendingModerationGroup(null)} className="flex-1 rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-300">Отмена</button>
                     <button type="button" onClick={() => pendingModerationGroup && moderateGroup.mutate({ groupId: pendingModerationGroup.id, action: "review", reason: moderationReasonDraft.trim() }, { onSuccess: () => setPendingModerationGroup(null) })} disabled={moderationReasonDraft.trim().length < 3 || moderateGroup.isPending} className="flex-1 rounded-xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">{moderateGroup.isPending ? "Снимаем…" : "Снять"}</button>
-                  </div>
+
                 </div>
               </SheetContent>
             </Sheet>
@@ -4203,7 +4203,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                           <button type="button" disabled={!walletConnectionRestored || createTonDepositMutation.isPending || markTonDepositSubmittedMutation.isPending} onClick={() => void startTonDeposit()} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#3390ec] px-3 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#4199ee] disabled:opacity-50"><WalletCards className="h-4 w-4" />{createTonDepositMutation.isPending ? tx("Готовим перевод…", "Preparing transfer…") : tx("Подтвердить в кошельке", "Confirm in wallet")}</button>
                         </>}
                         {tonDeposits.slice(0, 3).length > 0 && <section className="border-t border-white/8 pt-3"><div className="mb-2 flex items-center justify-between"><b className="text-[11px] text-slate-200">{tx("История пополнений", "Deposit history")}</b><span className="text-[9px] text-slate-500">GRAM</span></div><div className="space-y-2">{tonDeposits.slice(0, 3).map(deposit => <div key={deposit.id} className="rounded-xl border border-white/8 bg-white/[0.025] px-3 py-2.5"><div className="flex items-center justify-between gap-2"><b className="text-sm text-slate-100">{formatFinancialGram(deposit.creditedAmountTon ?? Number(deposit.requestedAmountNano) / 1_000_000_000)} GRAM</b><span className={deposit.status === "confirmed" ? "text-[10px] font-medium text-emerald-300" : deposit.status === "expired" || deposit.status === "rejected" ? "text-[10px] font-medium text-rose-300" : "text-[10px] font-medium text-amber-200"}>{deposit.status === "confirmed" ? tx("Зачислено", "Credited") : deposit.status === "submitted" ? tx("В обработке", "Processing") : deposit.status === "created" ? tx("Ожидает подписи", "Awaiting signature") : deposit.status === "rejected" ? tx("Возвращён", "Returned") : tx("Не подтверждено", "Not confirmed")}</span></div></div>)}</div></section>}
-                      </div>
+    
                     </SheetContent>
                   </Sheet>
                     <Sheet open={tonWithdrawalOpen} onOpenChange={open => {
@@ -4241,7 +4241,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
 
                         {tonWithdrawalFlow === "processing" && <div className="py-4 text-center"><span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-sky-300/25 bg-sky-300/[0.1]"><Send className="h-5 w-5 text-sky-200" /></span><h3 className="mt-3 text-base font-semibold">{withdrawalProcessingTitle}</h3><p className="mx-auto mt-1 max-w-[260px] text-xs leading-5 text-slate-500">{withdrawalProcessingNote}</p>{activeTonWithdrawal?.failureReason && <p className="mt-3 text-[11px] text-amber-200">{activeTonWithdrawal.failureReason}</p>}</div>}
                         {tonWithdrawals.slice(0, 3).length > 0 && <section className="border-t border-white/8 pt-3"><div className="mb-2 flex items-center justify-between"><b className="text-[11px] text-slate-200">{tx("История выводов", "Withdrawal history")}</b><span className="text-[9px] text-slate-500">GRAM</span></div><div className="space-y-2">{tonWithdrawals.slice(0, 3).map(withdrawal => <div key={withdrawal.id} className="rounded-xl border border-white/8 bg-white/[0.025] px-3 py-2.5"><div className="flex items-center justify-between gap-2"><b className="text-sm text-slate-100">{formatFinancialGram(Number(withdrawal.grossAmountNano) / 1_000_000_000)} GRAM</b><span className={withdrawal.status === "confirmed" ? "text-[10px] font-medium text-emerald-300" : withdrawal.status === "cancelled" ? "text-[10px] font-medium text-rose-300" : "text-[10px] font-medium text-sky-200"}>{withdrawal.status === "confirmed" ? tx("Отправлено", "Sent") : withdrawal.status === "cancelled" ? tx("Отмена", "Cancelled") : tx("В обработке", "Processing")}</span></div></div>)}</div></section>}
-                      </div>
+    
                     </SheetContent>
                   </Sheet>
                 </div>
@@ -4286,12 +4286,12 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       <div className="flex items-center justify-between gap-3">
                         <span className="min-w-0"><b className="block truncate text-sm">@{nft.username}</b><small className="mt-0.5 block text-[10px] text-slate-500">{nft.assetClass === "onchain" ? "On-chain" : "Off-chain"}</small></span>
                         <span className="text-[10px] text-slate-500">{nft.showcaseProfile ? tx("В профиле", "On profile") : nft.showcaseGroupId ? tx("На площадке", "On community") : tx("Скрыт", "Hidden")}</span>
-                      </div>
+    
                       <div className="mt-2 grid grid-cols-3 gap-2">
                         <button onClick={() => setNftShowcase.mutate({ nftId: nft.id, target: "profile" })} disabled={setNftShowcase.isPending} className="rounded-md border border-[#3f8cff]/35 bg-[#3f8cff]/10 px-2 py-1.5 text-[10px] font-medium text-[#a6c8ff]">{tx("Профиль", "Profile")}</button>
                         <button onClick={() => setShowcaseNftId(nft.id)} disabled={setNftShowcase.isPending} className="rounded-md border border-white/10 px-2 py-1.5 text-[10px] font-medium text-slate-300">{tx("Площадка", "Community")}</button>
                         <button onClick={() => setNftShowcase.mutate({ nftId: nft.id, target: "hidden" })} disabled={setNftShowcase.isPending} className="rounded-md border border-white/10 px-2 py-1.5 text-[10px] font-medium text-slate-400">{tx("Скрыть", "Hide")}</button>
-                  </div>
+
                 </div>
               ))}
               {isMyGroupsSearchActive && visibleMyGroups.length === 0 && (
@@ -4413,7 +4413,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       <span className="shrink-0 text-right">
                         {amount && <b className={`block text-sm ${item.direction === "in" ? "text-[#72a8ff]" : "text-slate-200"}`}>{amount}</b>}
                       </span>
-                    </div>;
+  ;
                   })}
                 </div>
               ) : (
@@ -4459,7 +4459,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                             </small>
                           </span>
                           <b className="shrink-0 text-sm text-[#a6c8ff]">{formatTon(deal.price)} GRAM</b>
-                        </div>
+      
                         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                           <span className="rounded-md bg-white/5 px-2 py-1 text-[10px] text-slate-300">
                             {dealStatusLabel(deal.status, deal.dealType)}
@@ -4499,11 +4499,11 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                               {tx("Подтвердить получение", "Confirm receipt")}
                             </button>
                           )}
-                        </div>
+      
                         <p className="mt-2 text-[11px] leading-4 text-slate-500">
                           {getProtectedDealGuidance(deal.status, isBuyer, Boolean(deal.buyerConfirmedAt), deal.dealType)}
                         </p>
-                      </div>
+    
                     );
                   })}
                 </div>
@@ -4905,7 +4905,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     {isListingForSale && <div className="order-3 relative"><Input value={salePriceTon} inputMode="decimal" onChange={event => { const value = event.target.value.replace(",", "."); if (/^\d*(\.\d?)?$/.test(value)) setSalePriceTon(value); }} placeholder={tx("Цена продажи", "Sale price")} className="h-9 border-white/10 bg-black/15 pr-10 text-[11px] placeholder:text-[11px]" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-medium text-slate-500">GRAM</span></div>}
                     <div className="order-4 flex items-center justify-between gap-3 rounded-lg bg-black/15 px-2.5 py-2"><span><b className="block text-[11px] text-slate-200">{tx("Вознаграждения", "Rewards")}</b><small className="mt-0.5 block text-[10px] text-slate-500">{rewardCampaignEnabled ? tx("GRAM за подтверждённые действия", "GRAM for confirmed actions") : tx("Выключены", "Off")}</small></span><button type="button" role="switch" aria-checked={rewardCampaignEnabled} onClick={() => setRewardCampaignEnabled(value => !value)} className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${rewardCampaignEnabled ? "border-[#72a8ff] bg-[#3f8cff]" : "border-white/15 bg-white/8"}`}><span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${rewardCampaignEnabled ? "translate-x-6" : "translate-x-0"}`} /></button></div>
                     {rewardCampaignEnabled && <div className="order-4 grid grid-cols-2 gap-2"><div className="relative"><Input value={rewardBudget} inputMode="decimal" onChange={event => setRewardBudget(event.target.value)} placeholder={tx("Бюджет", "Budget")} className="h-9 border-white/10 bg-black/15 pr-10 text-[11px] placeholder:text-[11px]" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-medium text-slate-500">GRAM</span></div><div className="relative"><Input value={rewardPerSubscription} inputMode="decimal" onChange={event => setRewardPerSubscription(event.target.value)} placeholder={starsPaymentGroup.category === "Чаты" ? tx("За участника", "Per member") : tx("За подписчика", "Per subscriber")} className="h-9 border-white/10 bg-black/15 pr-10 text-[11px] placeholder:text-[11px]" /><span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-medium text-slate-500">GRAM</span></div></div>}
-                  </div>
+
                 </section>
                 <label className="order-4 block"><span className="mb-2 block text-xs text-slate-400">{tx("Ваша ставка", "Your bid")}</span><span className="flex items-center rounded-2xl border border-white/8 bg-[#0b0f14] p-1"><button type="button" onClick={() => setBid(bidAmount - 0.1)} aria-label={tx("Уменьшить ставку", "Decrease bid")} className="grid h-12 w-12 place-items-center rounded-xl text-slate-300 transition-colors hover:bg-white/[0.06]"><Minus className="h-4 w-4" /></button><Input value={amount} inputMode="decimal" onChange={event => { const value = event.target.value.replace(",", "."); if (/^\d*(\.\d?)?$/.test(value)) setAmount(value); }} onBlur={() => setBid(Number(amount))} aria-label={tx("Сумма ставки в GRAM", "Bid amount in GRAM")} className="h-12 flex-1 border-0 bg-transparent px-0 text-center text-3xl font-semibold text-white focus-visible:ring-0" /><b className="mr-2 text-sm text-slate-400">GRAM</b><button type="button" onClick={() => setBid(bidAmount + 0.1)} aria-label={tx("Увеличить ставку", "Increase bid")} className="grid h-12 w-12 place-items-center rounded-xl text-[#a6c8ff] transition-colors hover:bg-[#3f8cff]/10"><Plus className="h-4 w-4" /></button></span></label>
                 <div className="order-5"><Slider value={[bidAmount]} min={minimum} max={maximum} step={0.1} onValueChange={([value]) => setBid(value)} className={`py-3 [&_[data-slot=slider-track]]:h-3 [&_[data-slot=slider-thumb]]:size-7 ${tone.range}`} /></div>
@@ -5121,8 +5121,8 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     <div className="grid grid-cols-2 gap-2">
                       <button type="button" onClick={() => openTelegramCommunityLink(privateEntryEligibleGroup.inviteLink!)} className="rounded-lg border border-[#3f8cff]/35 bg-[#3f8cff]/12 px-2 py-2 text-[10px] font-semibold text-[#a6c8ff]">{tx("Открыть", "Open")}</button>
                       <button type="button" onClick={() => void copyPrivateEntryLink(privateEntryEligibleGroup.inviteLink!)} className="rounded-lg border border-white/10 bg-white/[0.04] px-2 py-2 text-[10px] font-semibold text-slate-300">{tx("Скопировать", "Copy")}</button>
-                    </div>
-                  </div>
+  
+
                 )}
               </section>
             )}
@@ -5143,7 +5143,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     <div className="relative">
                       <Input value={monthlyEntryStars} type="number" inputMode="numeric" min="1" max="10000" step="1" onChange={event => setMonthlyEntryStars(event.target.value)} placeholder={tx("Цена за месяц", "Monthly price")} className="h-10 border-white/10 bg-[#0b0f14] pr-14 text-sm" />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-amber-100/80">★ / {tx("мес.", "mo.")}</span>
-                    </div>
+  
                     <Input value={monthlyEntryLinkName} maxLength={64} onChange={event => setMonthlyEntryLinkName(event.target.value)} placeholder={tx("Название ссылки (необязательно)", "Link name (optional)")} className="h-10 border-white/10 bg-[#0b0f14] text-sm" />
                     <button type="button" onClick={() => createMonthlyEntryLink.mutate({ groupId: monthlyEntryEligibleGroup.id })} disabled={createMonthlyEntryLink.isPending || !monthlyEntryEligibleGroup.monthlyEntryEnabled || monthlyEntryEligibleGroup.monthlyEntryStars !== Number(monthlyEntryStars) || (monthlyEntryEligibleGroup.monthlyEntryLinkName ?? "") !== monthlyEntryLinkName.trim()} className="flex w-full items-center justify-between rounded-lg border border-amber-200/20 bg-amber-300/10 px-3 py-2 text-left text-[11px] font-semibold text-amber-100 disabled:opacity-45">
                       <span>{createMonthlyEntryLink.isPending ? ui.loading : tx("Создать платную ссылку", "Create paid link")}</span>
@@ -5154,7 +5154,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     ) : (
                       <p className="text-[10px] leading-4 text-slate-500">{tx("Сначала сохраните цену, затем создайте ссылку Telegram.", "Save the price first, then create the Telegram link.")}</p>
                     )}
-                  </div>
+
                 )}
               </section>
             )}
@@ -5183,23 +5183,23 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     >
                       <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${rewardCampaignEnabled ? "translate-x-6" : "translate-x-0"}`} />
                     </button>
-                  </div>
+
                   {rewardCampaignEnabled && (
                     <div className="mt-3 space-y-2.5">
                       <div className="relative">
                         <Input value={rewardBudget} type="number" inputMode="decimal" min="0.01" step="0.01" onChange={event => setRewardBudget(event.target.value)} placeholder={tx("Бюджет кампании", "Campaign budget")} className="h-10 border-white/10 bg-[#0b0f14] pr-14 text-sm" />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#a6c8ff]">GRAM</span>
-                      </div>
+    
                       <div className="relative">
                         <Input value={rewardPerSubscription} type="number" inputMode="decimal" min="0.01" step="0.01" onChange={event => setRewardPerSubscription(event.target.value)} placeholder={isChannel ? tx("За подписчика", "Per subscriber") : tx("За добавленного участника", "Per added member")} className="h-10 border-white/10 bg-[#0b0f14] pr-14 text-sm" />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#a6c8ff]">GRAM</span>
-                      </div>
+    
                       <p className="text-[10px] leading-4 text-slate-500">
                         {isChannel
                           ? tx("Одна ставка применяется и к подписке, и к вступлению по персональной ссылке.", "One amount applies to subscriptions and personal invite-link joins.")
                           : tx("Вознаграждение получает тот, кто добавил нового участника напрямую, без ссылки.", "The reward goes to the user who adds a new member directly, without an invite link.")}
                       </p>
-                    </div>
+  
                   )}
                 </section>
               );
@@ -5221,7 +5221,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                       <small className="mt-0.5 block truncate text-[11px] text-slate-500">{managerGroup.managerName ? `${managerGroup.managerName}${managerPublic ? " · виден в карточке" : " · скрыт"}` : tx("Выберите администратора из Telegram", "Choose an administrator from Telegram")}</small>
                     </span>
                     <button type="button" onClick={() => { setLotGroupId(managerGroup.id); setSelectedManagerTelegramUserId(managerGroup.managerTelegramUserId ?? null); setManagerPublic(managerGroup.managerPublic !== false); setManagerSheetOpen(true); }} className="shrink-0 rounded-lg border border-[#3f8cff]/35 bg-[#3f8cff]/12 px-3 py-2 text-[10px] font-semibold text-[#a6c8ff] transition-colors hover:bg-[#3f8cff]/20">{managerGroup.managerName ? tx("Изменить", "Change") : tx("Выбрать", "Choose")}</button>
-                  </div>
+
                 </section>
               );
             })()}
@@ -5323,7 +5323,7 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                         </button>
                       );
                     })}
-                  </div>
+
                 ) : (
                   <div className="rounded-xl border border-dashed border-white/12 bg-[#0b0f14] p-5 text-center text-xs leading-5 text-slate-500">{tx("В вашем профиле пока нет NFT, доступных для передачи.", "There are no NFTs available to transfer in your profile yet.")}</div>
                 )}
