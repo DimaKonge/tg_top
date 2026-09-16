@@ -169,7 +169,7 @@ export const appRouter = router({
           groupId: input.groupId,
           bidAmount: Math.round(input.bidAmount * 1000),
         });
-        const invoiceLink = await createStarsRankingInvoiceLink({
+        const invoiceLink = await telegramService.createStarsRankingInvoiceLink({
           payload: intent.payload,
           starsAmount: intent.starsAmount,
           groupTitle: intent.groupTitle,
