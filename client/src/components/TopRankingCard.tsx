@@ -86,7 +86,7 @@ export function TopRankingCard({ group, variant, language, avatarSrc: initialAva
         }
       }}
       aria-label={group ? `${language === "en" ? "Open" : "Открыть"} ${group.title}` : undefined}
-      style={getCommunityCardBackgroundStyle(group?.cardBackgroundPreset)}
+      style={getCommunityCardBackgroundStyle(group?.cardBackgroundPreset, "hero")}
       className={`tg-community-card relative min-w-0 w-full overflow-hidden rounded-2xl border text-left transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-[#3f8cff]/55 hover:shadow-[0_10px_28px_rgba(63,140,255,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3f8cff]/70 active:translate-y-0 active:scale-[0.99] ${cardStyle}`}
     >
       {group?.rewardActive && (group.rewardAmount ?? 0) > 0 && (
@@ -107,7 +107,10 @@ export function TopRankingCard({ group, variant, language, avatarSrc: initialAva
           ) : (
             <span className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_35%_22%,var(--tg-community-card-accent,#254e7a)_0%,var(--tg-community-card-bg,#111720)_70%)] p-[24%]"><TgTopAnimatedPyramidAvatar className="h-full w-full" title="TG TOP" /></span>
           )}
-          <span className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,10,15,0.06)_8%,rgba(7,10,15,0.82)_100%)]" />
+          <span
+            style={group.cardBackgroundPreset ? { background: "linear-gradient(180deg, rgba(0,0,0,0.04) 10%, color-mix(in srgb, var(--tg-community-card-bg, #070a0f) 85%, transparent) 100%)" } : undefined}
+            className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,10,15,0.06)_8%,rgba(7,10,15,0.82)_100%)]"
+          />
           <span className={`tg-media-overlay-content absolute inset-x-0 bottom-0 min-w-0 ${compact ? "p-2" : lead ? "p-5 sm:p-6" : "p-3 sm:p-4"}`}>
             <b className={`${lead ? "text-xl" : compact ? "text-[11px]" : "text-sm"} tg-media-overlay-title block max-w-full truncate font-semibold text-white`}>{group.title}</b>
             <small className={`tg-media-overlay-meta mt-1 block max-w-full truncate text-slate-200/80 ${compact ? "text-[8px]" : "text-xs"}`}>

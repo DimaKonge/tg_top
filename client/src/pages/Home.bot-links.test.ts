@@ -774,9 +774,9 @@ describe("TG TOP production bot links", () => {
     expect(source).toContain('tx("Как в приложении", "Use app color")');
     expect(source).toContain('cardBackgroundPreset: listingCardBackgroundPreset');
     expect(source).toContain('setListingCardBackgroundSheetOpen(true)');
-    expect(topCard).toContain('style={getCommunityCardBackgroundStyle(group?.cardBackgroundPreset)}');
-    expect(compactRow).toContain('style={getCommunityCardBackgroundStyle(group?.cardBackgroundPreset)}');
+    expect(topCard).toContain('style={getCommunityCardBackgroundStyle(group?.cardBackgroundPreset, "hero")}');
+    expect(compactRow).toContain('style={getCommunityCardBackgroundStyle(group?.cardBackgroundPreset, "hero")}');
     expect(styles).toContain('.tg-community-card');
-    expect(styles).toContain('var(--tg-community-card-bg, var(--tg-surface))');
+    expect(styles).toContain('var(--tg-community-card-accent)');
   });
 });
