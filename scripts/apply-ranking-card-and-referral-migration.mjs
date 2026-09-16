@@ -39,6 +39,14 @@ try {
     } else {
       console.log("Column groups_catalog.cardBackgroundPreset already exists.");
     }
+
+    if (!(await hasColumn("groups_catalog", "isNsfw"))) {
+      console.log("Adding isNsfw column to groups_catalog...");
+      await connection.query("ALTER TABLE `groups_catalog` ADD COLUMN `isNsfw` boolean NOT NULL DEFAULT false");
+      console.log("Column isNsfw added successfully.");
+    } else {
+      console.log("Column groups_catalog.isNsfw already exists.");
+    }
   }
 
   // 2. Add bonus_credit_audits (Migration 0065)
