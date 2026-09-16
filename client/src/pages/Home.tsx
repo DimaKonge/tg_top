@@ -2859,26 +2859,6 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     <span className="text-[10px] text-slate-500">{tx("цифровые активы Telegram", "Telegram digital assets")}</span>
                   </span>
                   <div className="flex items-center gap-1.5">
-                    {isAuthenticated && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setNftListingAssetClass("offchain");
-                            setNftListingItemAddress("");
-                            setNftListingUsername("");
-                            setNftListingSheetOpen(true);
-                          }}
-                          className="flex items-center gap-1 rounded-lg border border-emerald-500/35 bg-emerald-500/12 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/20 active:scale-[0.98]"
-                        >
-                          <Plus className="h-3 w-3" />
-                          {tx("Залистить NFT", "List NFT")}
-                        </button>
-                        <button onClick={openNftTransfer} className="rounded-lg border border-[#3f8cff]/35 bg-[#3f8cff]/10 px-2.5 py-1.5 text-[10px] font-semibold text-[#a6c8ff]">
-                          {tx("Заявка на передачу", "Transfer request")}
-                        </button>
-                      </>
-                    )}
                   </div>
                 </div>
                 <div aria-label="Рубрики NFT" className="flex gap-1.5 overflow-x-auto rounded-lg border border-white/8 bg-[#111720] p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -3919,7 +3899,6 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                     </section>
                   )}
                 </div>
-                <NftShowcase nfts={detail.ownerNfts} language={language} title={tx("NFT-витрина площадки", "Community NFT showcase")} />
               </>
             ) : (
               <p className="py-16 text-center text-sm text-slate-500">
@@ -3950,7 +3929,6 @@ export default function Home({ onReady }: { onReady?: () => void }) {
                   <h2 className="px-1 text-sm font-semibold">{tx("Площадки владельца", "Owner communities")}</h2>
                   {publicOwner.groups.map(group => <CompactCommunityRow key={group.id} group={group} language={language} accessLabel={getCommunityAccessLabel(group, language)} salePrice={group.listingType === "sale" && group.salePriceTon ? formatTon(group.salePriceTon) : undefined} onOpen={() => openGroup(group.id)} />)}
                 </section>
-                <NftShowcase nfts={publicOwner.nfts} language={language} title={tx("NFT-витрина владельца", "Owner NFT showcase")} />
               </>
             ) : (
               <p className="py-16 text-center text-sm text-slate-500">{tx("Загружаем профиль владельца…", "Loading owner profile…")}</p>
