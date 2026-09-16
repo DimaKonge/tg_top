@@ -18,6 +18,7 @@ import { financeProcedures } from "./routers/financeRouter";
 import { supportRouter } from "./routers/supportRouter";
 import * as auctionService from "./modules/auction";
 import * as catalogService from "./modules/catalog";
+import * as moderationService from "./modules/moderation";
 import { getTelegramIdFromOpenId } from "./onboardingIntentPolicy";
 import { canRefreshGroupMediaSnapshot, shouldUpdateAnimatedAvatarSnapshot } from "./groupMediaSnapshotPolicy";
 import { CARD_BACKGROUND_PRESET_IDS, type CardBackgroundPreset } from "../shared/card-background-presets";
@@ -299,7 +300,7 @@ export const appRouter = router({
       }),
 
     getModerationAccess: protectedProcedure.query(async ({ ctx }) => {
-      return await db.getModerationAccess(ctx.user.openId);
+      return await moderationService.getModerationAccess(ctx.user.openId);
     }),
 
     getReferralOverview: protectedProcedure.query(async ({ ctx }) => {
@@ -378,19 +379,19 @@ export const appRouter = router({
       }),
 
     getModerationQueue: protectedProcedure.query(async ({ ctx }) => {
-      const access = await db.getModerationAccess(ctx.user.openId);
+      const access = await moderationService.getModerationAccess(ctx.user.openId);
       if (!access.canModerate) throw new Error("Недостаточно прав для просмотра очереди модерации");
-      return await db.getModerationQueue();
+      return await moderationService.getModerationQueue();
     }),
 
     getBotModerationQueue: protectedProcedure.query(async ({ ctx }) => {
-      const access = await db.getModerationAccess(ctx.user.openId);
+      const access = await moderationService.getModerationAccess(ctx.user.openId);
       if (!access.canModerate) throw new Error("Недостаточно прав для просмотра заявок ботов");
       return await catalogService.getBotModerationQueue();
     }),
 
     getAllBotListings: protectedProcedure.query(async ({ ctx }) => {
-      const access = await db.getModerationAccess(ctx.user.openId);
+      const access = await moderationService.getModerationAccess(ctx.user.openId);
       if (!access.canModerate) throw new Error("Недостаточно прав для просмотра каталога ботов");
       return await catalogService.getAllBotListings();
     }),
@@ -398,7 +399,7 @@ export const appRouter = router({
     deleteBotListing: protectedProcedure
       .input(z.object({ botListingId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {
-        const access = await db.getModerationAccess(ctx.user.openId);
+        const access = await moderationService.getModerationAccess(ctx.user.openId);
         if (!access.canModerate) throw new Error("Недостаточно прав для удаления ботов");
         return await catalogService.deleteBotListing(ctx.user.openId, input.botListingId);
       }),
@@ -411,7 +412,7 @@ export const appRouter = router({
         reason: z.string().trim().max(255).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const access = await db.getModerationAccess(ctx.user.openId);
+        const access = await moderationService.getModerationAccess(ctx.user.openId);
         if (!access.canModerate) throw new Error("Недостаточно прав для модерации заявок ботов");
         if (input.action === "reject" && (!input.reason || input.reason.length < 3)) {
           throw new Error("Укажите причину отклонения заявки на бота");
@@ -420,9 +421,9 @@ export const appRouter = router({
       }),
 
     getActiveModerationListings: protectedProcedure.query(async ({ ctx }) => {
-      const access = await db.getModerationAccess(ctx.user.openId);
+      const access = await moderationService.getModerationAccess(ctx.user.openId);
       if (!access.canModerate) throw new Error("Недостаточно прав для просмотра активных лотов");
-      return await db.getActiveModerationListings();
+      return await moderationService.getActiveModerationListings();
     }),
 
     moderateGroup: protectedProcedure
@@ -432,9 +433,9 @@ export const appRouter = router({
         reason: z.string().trim().min(3).max(255),
       }))
       .mutation(async ({ ctx, input }) => {
-        const access = await db.getModerationAccess(ctx.user.openId);
+        const access = await moderationService.getModerationAccess(ctx.user.openId);
         if (!access.canModerate) throw new Error("Недостаточно прав для модерации лотов");
-        const group = await db.moderateGroup(ctx.user.openId, input.groupId, input.action, input.reason);
+        const group = await moderationService.moderateGroup(ctx.user.openId, input.groupId, input.action, input.reason);
         const ownerNotified = input.action !== "approve"
           ? await notifyCommunityRemovedFromTop({ openId: group.ownerOpenId, groupTitle: group.title, reason: input.reason })
           : false;
@@ -442,15 +443,15 @@ export const appRouter = router({
       }),
 
     getModerators: protectedProcedure.query(async ({ ctx }) => {
-      const access = await db.getModerationAccess(ctx.user.openId);
+      const access = await moderationService.getModerationAccess(ctx.user.openId);
       if (!access.canManageModerators) throw new Error("Недостаточно прав для управления модераторами");
-      return await db.getModerators();
+      return await moderationService.getModerators();
     }),
 
     setModeratorRole: protectedProcedure
       .input(z.object({ telegramUsername: z.string().trim().min(2).max(128), role: z.enum(["moderator", "user"]) }))
       .mutation(async ({ ctx, input }) => {
-        return await db.setModeratorRole(ctx.user.openId, input.telegramUsername, input.role);
+        return await moderationService.setModeratorRole(ctx.user.openId, input.telegramUsername, input.role);
       }),
 
     setPublicProfile: protectedProcedure
@@ -523,7 +524,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const group = await db.getGroupById(input.groupId);
         if (!group) throw new Error("Сообщество не найдено");
-        const access = group.username ? { canModerate: false } : await db.getModerationAccess(ctx.user.openId);
+        const access = group.username ? { canModerate: false } : await moderationService.getModerationAccess(ctx.user.openId);
         if (!canResolveVerifiedEntryLink({ target: group, viewerOpenId: ctx.user.openId, canModerate: access.canModerate })) {
           throw new Error("Закрытая ссылка доступна только владельцу сообщества или модератору");
         }
