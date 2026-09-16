@@ -49,7 +49,7 @@ export function CommunityAvatar({
 }) {
   const [videoFailed, setVideoFailed] = useState(false);
   const { candidates, candidateIndex, setCandidateIndex, imageLoaded, setImageLoaded } = useGroupAvatarInfo(group);
-  const avatarSrc = candidates[candidateIndex] || null;
+  const avatarSrc = candidateIndex < candidates.length ? candidates[candidateIndex] : null;
   const sizeClasses = hero
     ? "h-20 w-20 rounded-2xl"
     : large
@@ -59,14 +59,36 @@ export function CommunityAvatar({
     : "h-11 w-11 rounded-xl";
 
   return (
-    <span className={`relative ${sizeClasses} grid shrink-0 place-items-center overflow-hidden border border-white/10 bg-[#1b2430] text-sm font-semibold text-slate-200`}>
+    <span className={`relative ${sizeClasses} grid shrink-0 place-items-center overflow-hidden border border-white/10 bg-[#151f2e] text-sm font-semibold text-slate-200`}>
+      {/* Branded Fallback (always present beneath the image) */}
+      <span className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_35%_22%,#254e7a_0%,#111720_70%)] p-[20%]">
+        <TgTopAnimatedPyramidAvatar className="h-full w-full" title="TG TOP" />
+      </span>
+
       {allowAnimatedMedia && group.animatedAvatarUrl && !videoFailed ? (
-        <video key={group.animatedAvatarUrl} src={group.animatedAvatarUrl} poster={avatarSrc ?? undefined} muted loop autoPlay playsInline preload="metadata" disablePictureInPicture className="h-full w-full object-cover" onLoadedData={event => { void event.currentTarget.play().catch(() => undefined); }} onError={() => setVideoFailed(true)} />
+        <video
+          key={group.animatedAvatarUrl}
+          src={group.animatedAvatarUrl}
+          poster={avatarSrc ?? undefined}
+          muted
+          loop
+          autoPlay
+          playsInline
+          preload="metadata"
+          disablePictureInPicture
+          className="absolute inset-0 h-full w-full object-cover"
+          onLoadedData={event => { void event.currentTarget.play().catch(() => undefined); }}
+          onError={() => setVideoFailed(true)}
+        />
       ) : avatarSrc ? (
-        <img src={avatarSrc} alt="" onError={() => setCandidateIndex(prev => prev + 1)} onLoad={() => setImageLoaded(true)} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${imageLoaded ? "opacity-100" : "opacity-0"}`} />
-      ) : (
-        <TgTopAnimatedPyramidAvatar className="h-[62%] w-[62%]" title="TG TOP" />
-      )}
+        <img
+          src={avatarSrc}
+          alt=""
+          onError={() => setCandidateIndex(prev => prev + 1)}
+          onLoad={() => setImageLoaded(true)}
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
+        />
+      ) : null}
     </span>
   );
 }
@@ -74,16 +96,39 @@ export function CommunityAvatar({
 export function FullBleedCommunityArtwork({ group, allowAnimatedMedia = false }: { group: CommunityArtworkGroup; allowAnimatedMedia?: boolean }) {
   const [videoFailed, setVideoFailed] = useState(false);
   const { candidates, candidateIndex, setCandidateIndex, imageLoaded, setImageLoaded } = useGroupAvatarInfo(group);
-  const avatarSrc = candidates[candidateIndex] || null;
+  const avatarSrc = candidateIndex < candidates.length ? candidates[candidateIndex] : null;
   return (
     <span className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_50%_20%,#253a58_0%,#111720_68%)]">
+      {/* Branded Fallback */}
+      <span className="absolute inset-0 grid place-items-center bg-[radial-gradient(circle_at_35%_22%,#254e7a_0%,#111720_70%)] p-[24%]">
+        <TgTopAnimatedPyramidAvatar className="h-full w-full" title="TG TOP" />
+      </span>
+
       {allowAnimatedMedia && group.animatedAvatarUrl && !videoFailed ? (
-        <video key={group.animatedAvatarUrl} src={group.animatedAvatarUrl} poster={avatarSrc ?? undefined} muted loop autoPlay playsInline preload="metadata" disablePictureInPicture className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover transition-transform duration-300 group-hover:scale-105 [-webkit-touch-callout:none]" onLoadedData={event => { void event.currentTarget.play().catch(() => undefined); }} onError={() => setVideoFailed(true)} />
-      ) : avatarSrc && !false ? (
-        <img src={avatarSrc} alt="" draggable={false} onError={() => setCandidateIndex(prev => prev + 1)} onLoad={() => setImageLoaded(true)} className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${imageLoaded ? "opacity-100" : "opacity-0"}`} />
-      ) : (
-        <span className="grid h-full w-full place-items-center bg-[radial-gradient(circle_at_35%_22%,#254e7a_0%,#111720_70%)] p-[24%]"><TgTopAnimatedPyramidAvatar className="h-full w-full" title="TG TOP" /></span>
-      )}
+        <video
+          key={group.animatedAvatarUrl}
+          src={group.animatedAvatarUrl}
+          poster={avatarSrc ?? undefined}
+          muted
+          loop
+          autoPlay
+          playsInline
+          preload="metadata"
+          disablePictureInPicture
+          className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover transition-transform duration-300 group-hover:scale-105 [-webkit-touch-callout:none]"
+          onLoadedData={event => { void event.currentTarget.play().catch(() => undefined); }}
+          onError={() => setVideoFailed(true)}
+        />
+      ) : avatarSrc ? (
+        <img
+          src={avatarSrc}
+          alt=""
+          draggable={false}
+          onError={() => setCandidateIndex(prev => prev + 1)}
+          onLoad={() => setImageLoaded(true)}
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
+        />
+      ) : null}
     </span>
   );
 }
